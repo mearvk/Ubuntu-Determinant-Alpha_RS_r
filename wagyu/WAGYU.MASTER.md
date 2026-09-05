@@ -3,41 +3,45 @@
 **Project:** Ubuntu Determinant
 **Edition:** Ubuntu White Edition
 **Project attention:** Max Rupplin — MEARVK LLC — 2026
-**Status:** Master data register — DEFINITIONS COMPLETE, VALUES SPARSE (reported figures written in with citations; all others Not Reported)
+**Status:** Intrinsic Series ASSIGNED (canonical) — values sparse (reported figures cited; all others Not Reported)
 
 ---
 
 ## 0. Data-integrity contract (read first)
 
-This document is a **master data register**. It is governed by one rule:
+Master data register, one rule:
 
-> **No value in this register is invented and then presented as measured fact.**
+> **No value is invented and then presented as measured fact.**
 
-- Cells with a real, published figure are written plainly and carry a **source tag** `[Sn]` (see §6).
-- Cells with **no reported Wagyu-specific value** are `NR*` — *Not Reported*.
-- A `~` and `*` on a figure means a unit conversion (e.g. JPY/AUD→USD) or a
-  published *estimate*, not a fresh observation; the basis is in §5/§6.
-
-Why most cells are still `NR*`: this is the result of an exhaustive source
-sweep (see §6). Every candidate document — the Australian Wagyu Association,
-Japan MAFF/JLEC, Wagyu International, national statistics, FAOSTAT and UN
-Comtrade — was checked. Direct page retrieval was **blocked (HTTP 403)** in
-this environment, so only figures visible in indexed search results could be
-captured, and **no source anywhere publishes Wagyu broken out per-country,
-per-year, across 19 metrics** — because "Wagyu" is a cattle *breed set*, not a
-customs commodity code, so trade/production statistics record *beef*, not
-*Wagyu*. The reported figures that DO exist are written into their exact
-country/year cells below; the rest is honestly `NR*` rather than fabricated.
+Reported figures are written plainly with a source tag `[Sn]` (§6). Unreported
+cells are `NR*`. `~ … *` marks a unit conversion or a published estimate. Most
+cells are `NR*` because "Wagyu" is a cattle *breed set*, not a customs commodity
+code, so no public source publishes it per-country/per-year across the series;
+see §6 for the full source sweep (page fetches were blocked HTTP 403, so only
+indexed-result figures could be captured).
 
 ## 1. The economic unit of Wagyu (the product)
 
-> **one kilogram of graded Wagyu carcass-weight beef (kg cwt)**, from cattle
+> **one kilogram of graded Wagyu carcass-weight beef (kg cwt)** — cattle
 > registered/graded as Wagyu (fullblood, purebred, or graded crossbred per the
-> relevant national herdbook), valued in **US dollars** at the wholesale/boxed
-> point of sale. Head- and herd-based fields are recorded alongside because the
-> carcass unit derives from them.
+> relevant national herdbook), valued in **USD** at the wholesale/boxed point of
+> sale. Head- and herd-based fields are recorded alongside because the carcass
+> unit derives from them.
 
-## 2. The 19 data points (schema)
+## 2. The Wagyu Intrinsic Series (the 19+ data points) — CANONICAL
+
+The following ordered set is hereby **assigned as the Wagyu Intrinsic Series**:
+the canonical, invariant set of data points recorded for the Wagyu economic unit
+at every `(country, year)` coordinate. It is the authoritative column definition
+for this register and for any downstream data feed; field codes are stable and
+must not be renumbered.
+
+The series is **19+**: nineteen **core** intrinsic points (the I-19) plus a
+declared **extension block** (E-series). "19+" means the core count is fixed at
+19 and the series is extensible only by appending higher codes (F20, F21, …) —
+never by altering F01–F19.
+
+**Core intrinsic series — I-19 (F01–F19):**
 
 
 - **F01** — Registered Wagyu / Wagyu-influenced cattle (head)
@@ -60,70 +64,68 @@ country/year cells below; the rest is honestly `NR*` rather than fabricated.
 - **F18** — Domestic Wagyu consumption (tonnes)
 - **F19** — Registered Wagyu breeders / seedstock members / DB individuals
 
+**Extension block — E-series (the "+"; part of the intrinsic series, reserved & appended):**
+
+- **F20** — Herd growth rate, year-on-year (%)
+- **F21** — Feed-cost index (relative, base year = 100)
+- **F22** — Registered Wagyu brands / certification marks (count)
+
+
+**Series invariants**
+
+- **Cardinality:** 19 core + 3 extension = **22** points (≥ 19+).
+- **Coordinate:** every record is indexed by `(country, year)` with `year ∈ [2002, 2026]` (25 years).
+- **Order & codes are canonical:** F01…F22 are fixed identifiers; renumbering is prohibited.
+- **Extensibility:** append-only (F23+). The core I-19 is frozen.
+- **Unit:** the economic unit of §1; monetary points normalised to USD (originals noted in §6).
+
+Every country in §7 carries the complete intrinsic series (22 rows × 25 years).
 
 ## 3. Legend
 
 | Symbol | Meaning |
 |---|---|
 | `123 [S1]` | Reported value with source tag |
-| `~ … *` | unit-converted and/or published estimate (not a fresh observation) |
+| `~ … *` | unit-converted and/or published estimate |
 | `NR*` | Not reported for this country-year |
-| `producer` / `importer` / `no-data` | documented Wagyu breeding-or-production / export-destination / none found |
+| `producer` / `importer` / `no-data` | documented breeding-or-production / export-destination / none found |
 
-## 4. Reported values actually captured (the real data written into the tables)
+## 4. Reported values written into the tables
 
-Every figure below is placed in its exact country/year cell in §7.
-
-**Japan**
-- Wagyu cattle in Japan: **1,368,800 head** (JIRCAS historical review). [S14]
-- Japanese Black = **>90%** of Japan's Wagyu. [S15]
-- Intramuscular fat in Japanese Black longissimus: **>30%**. [S16]
-- 2024 beef exports (overwhelmingly Wagyu): **10,826 tonnes**, **¥64.8 bn** — record 2nd straight year; US+Canada ≈ 23% of value; top markets US/Taiwan/Hong Kong. [S3][S7b][S17]
-
-**Australia**
-- Registered dams **104,222** and sires **12,224** (2015 ten-year-trends). [S18]
-- Calves added to AWA database: **>25,000/yr** (recent); an AWA role posting cites **>40,000/yr**. [S9][S19]
-- AWA membership **~1,200 (450 international)** (2024) → **>1,500 (650 international)** (2025); genomics database **>400,000 individuals**. [S5][S20][S21]
-- Boxed production value **AUD ~2.0 bn (2023)**, ~80% exported to 40+ countries. [S4]
-
-**United States**
-- **<5,000 Fullblood Wagyu** in America (AWA estimate, ~2022). [S22]
-- American Wagyu Association membership **>900** (2021). [S23]
-
-**Global context (third-party market models; sources disagree, context only):** global Wagyu market USD **~13.6–26.9 bn (2025)**. [S12][S13][S24]
+**Japan** — Wagyu cattle 1,368,800 head [S14]; Japanese Black >90% [S15]; IMF >30% [S16]; 2024 beef exports 10,826 t / ¥64.8bn, top markets US/Taiwan/Hong Kong, US+Canada ~23% of value [S3][S7b][S17].
+**Australia** — 104,222 dams + 12,224 sires (2015) [S18]; >25,000-40,000 calves/yr [S9][S19]; membership ~1,200 (2024) -> >1,500 / DB >400,000 (2025) [S5][S20][S21]; boxed value AUD ~2.0bn (2023) [S4].
+**United States** — <5,000 Fullblood (est., ~2022) [S22]; >900 AWA members (2021) [S23].
+**Global context (third-party models, disagree; context only):** ~US$13.6-26.9bn (2025) [S12][S13][S24].
 
 ## 5. Notes on conversions / estimates
 
-- `~US$` values convert JPY/AUD at approximate period rates and are flagged `*`; treat as order-of-magnitude.
-- "Fullblood <5,000 (US)" and market-size figures are **published estimates by their sources**, not censuses; they are tagged and dated, and never spread across other years.
-- No `NR*` cell has been back-filled by interpolation. Absence is recorded as absence.
+`~US$` values convert JPY/AUD at approximate period rates (flagged `*`). US Fullblood count and market-size figures are their sources' published estimates, dated and never spread across other years. No `NR*` cell is interpolated.
 
 ## 6. Sources checked (full sweep) and citations
 
-Direct fetches returned HTTP 403 in this environment; values are from indexed result snippets. Content was rephrased/summarised for compliance.
+Direct fetches returned HTTP 403; values are from indexed result snippets, rephrased for compliance.
 
-- **[S3]** JLEC/industry export ranking — 2024 ≈ ¥64.8bn, 10,826 t. rakusurukurasi.com / note.com
+- **[S3]/[S17]** JLEC / note.com (Asahi Trading) — 2024 ¥64.8bn, 10,826 t; US+Canada 23% of value. rakusurukurasi.com / note.com
 - **[S4]** Australian Wagyu Association — largest exporter; AUD ~2.0bn boxed (2023); ~80% to 40+ countries. wagyu.org.au
 - **[S5]** AWA International Wagyu Office Fact Sheet (2024) — ~1,200 members (450 intl). wagyu.org.au
-- **[S7b]** Nippon.com — beef ¥64.8bn, record; US/Taiwan/Hong Kong lead. nippon.com
-- **[S9]** AWA (about/become-a-member) — >25,000 calves/yr. wagyu.org.au
-- **[S12]** Fortune Business Insights — global market ~US$26.9bn (2025). fortunebusinessinsights.com
-- **[S13]** Straits Research / Mordor — global ~US$13.6–13.9bn (2025); Japan ~US$1.46bn; APAC ~US$4.68bn. straitsresearch.com / mordorintelligence.com
-- **[S14]** JIRCAS (JARQ) — total 1,368,800 Wagyu cattle in Japan. jircas.go.jp
+- **[S7b]** Nippon.com — beef ¥64.8bn record; US/Taiwan/Hong Kong lead. nippon.com
+- **[S9]** AWA — >25,000 calves/yr. wagyu.org.au
+- **[S12]** Fortune Business Insights — ~US$26.9bn (2025). fortunebusinessinsights.com
+- **[S13]** Straits Research / Mordor — ~US$13.6-13.9bn (2025); Japan ~US$1.46bn; APAC ~US$4.68bn. straitsresearch.com / mordorintelligence.com
+- **[S14]** JIRCAS (JARQ) — 1,368,800 Wagyu cattle in Japan. jircas.go.jp
 - **[S15]** Wikipedia (Wagyu) — Japanese Black >90% of Japan Wagyu. en.wikipedia.org
-- **[S16]** ResearchGate — Japanese Wagyu industry review; IMF >30% in Japanese Black longissimus. researchgate.net
-- **[S17]** note.com (Asahi Trading, citing JLPEC) — 2024 ¥64.8bn / 10,826 t; US+Canada 23% of value. note.com
+- **[S16]** ResearchGate — Japanese Wagyu industry review; IMF >30%. researchgate.net
 - **[S18]** AWA Ten-Year-Trends Part 1 — 104,222 dams; sires up 2.6× to 12,224 (to 2015). wagyu.org.au
 - **[S19]** AWA (Member Services Officer posting) — >40,000 new calves/yr. wagyu.org.au
 - **[S20]** AWA (partners) — >1,500 members incl. >650 international (2025). wagyu.org.au
 - **[S21]** AWA ("Continued success…") — genomics database >400,000 individuals. wagyu.org.au
 - **[S22]** Good Ranchers (citing AWA) — <5,000 Fullblood Wagyu in the US (~2022). goodranchers.com
 - **[S23]** AZ Central — American Wagyu Association >900 members (2021). azcentral.com
-- **[S24]** 360iResearch — global market ~US$20.25bn (2025). 360iresearch.com
+- **[S24]** 360iResearch — ~US$20.25bn (2025). 360iresearch.com
 
-Sources that exist but could not yield per-year per-country tables (breed not separated from beef, or fetch blocked): MAFF (maff.go.jp), JETRO (jetro.go.jp), UN Comtrade, FAOSTAT, Wagyu International (wagyuinternational.co), Kobe University / Anim. Biosci. papers.
+Checked but no per-country/per-year series (breed not separated, or fetch blocked): MAFF, JETRO, UN Comtrade, FAOSTAT, Wagyu International, Kobe University / Anim. Biosci. papers.
 
-## 7. Per-country register (alphabetical) — 25 years × 19 fields
+## 7. Per-country register (alphabetical) — full intrinsic series (22 points) × 25 years
 
 Reported cells carry a source tag; every other cell is `NR*`.
 
@@ -153,6 +155,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Albania
 
@@ -179,6 +184,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Algeria
 
@@ -205,6 +213,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Andorra
 
@@ -231,6 +242,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Angola
 
@@ -257,6 +271,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Antigua and Barbuda
 
@@ -283,6 +300,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Argentina
 
@@ -309,6 +329,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Armenia
 
@@ -335,10 +358,13 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Australia
 
-- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (see tagged cells).
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (tagged cells).
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -360,7 +386,10 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F16 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 12,224 sires [S18] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~1,200 members (450 intl) [S5] | >1,500 members (650 intl); DB >400,000 individuals [S20][S21] | NR* |
+| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 12,224 sires [S18] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~1,200 members (450 intl) [S5] | >1,500 members (650 intl); DB >400,000 [S20][S21] | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Austria
 
@@ -387,6 +416,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Azerbaijan
 
@@ -413,6 +445,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Bahamas
 
@@ -439,6 +474,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Bahrain
 
@@ -465,6 +503,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Bangladesh
 
@@ -491,6 +532,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Barbados
 
@@ -517,6 +561,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Belarus
 
@@ -543,6 +590,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Belgium
 
@@ -569,6 +619,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Belize
 
@@ -595,6 +648,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Benin
 
@@ -621,6 +677,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Bhutan
 
@@ -647,6 +706,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Bolivia
 
@@ -673,6 +735,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Bosnia and Herzegovina
 
@@ -699,6 +764,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Botswana
 
@@ -725,6 +793,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Brazil
 
@@ -751,6 +822,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Brunei
 
@@ -777,6 +851,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Bulgaria
 
@@ -803,6 +880,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Burkina Faso
 
@@ -829,6 +909,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Burundi
 
@@ -855,6 +938,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Cabo Verde
 
@@ -881,6 +967,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Cambodia
 
@@ -907,6 +996,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Cameroon
 
@@ -933,6 +1025,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Canada
 
@@ -959,6 +1054,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Central African Republic
 
@@ -985,6 +1083,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Chad
 
@@ -1011,6 +1112,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Chile
 
@@ -1037,6 +1141,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### China
 
@@ -1063,6 +1170,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Colombia
 
@@ -1089,6 +1199,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Comoros
 
@@ -1115,6 +1228,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Congo (Brazzaville)
 
@@ -1141,6 +1257,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Congo (Kinshasa)
 
@@ -1167,6 +1286,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Costa Rica
 
@@ -1193,6 +1315,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Croatia
 
@@ -1219,6 +1344,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Cuba
 
@@ -1245,6 +1373,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Cyprus
 
@@ -1271,6 +1402,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Czechia
 
@@ -1297,6 +1431,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Denmark
 
@@ -1323,6 +1460,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Djibouti
 
@@ -1349,6 +1489,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Dominica
 
@@ -1375,6 +1518,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Dominican Republic
 
@@ -1401,6 +1547,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Ecuador
 
@@ -1427,6 +1576,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Egypt
 
@@ -1453,6 +1605,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### El Salvador
 
@@ -1479,6 +1634,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Equatorial Guinea
 
@@ -1505,6 +1663,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Eritrea
 
@@ -1531,6 +1692,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Estonia
 
@@ -1557,6 +1721,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Eswatini
 
@@ -1583,6 +1750,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Ethiopia
 
@@ -1609,6 +1779,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Fiji
 
@@ -1635,6 +1808,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Finland
 
@@ -1661,6 +1837,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### France
 
@@ -1687,6 +1866,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Gabon
 
@@ -1713,6 +1895,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Gambia
 
@@ -1739,6 +1924,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Georgia
 
@@ -1765,6 +1953,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Germany
 
@@ -1791,6 +1982,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Ghana
 
@@ -1817,6 +2011,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Greece
 
@@ -1843,6 +2040,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Grenada
 
@@ -1869,6 +2069,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Guatemala
 
@@ -1895,6 +2098,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Guinea
 
@@ -1921,6 +2127,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Guinea-Bissau
 
@@ -1947,6 +2156,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Guyana
 
@@ -1973,6 +2185,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Haiti
 
@@ -1999,6 +2214,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Honduras
 
@@ -2025,6 +2243,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Hungary
 
@@ -2051,6 +2272,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Iceland
 
@@ -2077,6 +2301,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### India
 
@@ -2103,6 +2330,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Indonesia
 
@@ -2129,6 +2359,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Iran
 
@@ -2155,6 +2388,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Iraq
 
@@ -2181,6 +2417,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Ireland
 
@@ -2207,6 +2446,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Israel
 
@@ -2233,6 +2475,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Italy
 
@@ -2259,6 +2504,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Ivory Coast
 
@@ -2285,6 +2533,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Jamaica
 
@@ -2311,10 +2562,13 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Japan
 
-- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (see tagged cells).
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (tagged cells).
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2337,6 +2591,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Jordan
 
@@ -2363,6 +2620,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Kazakhstan
 
@@ -2389,6 +2649,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Kenya
 
@@ -2415,6 +2678,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Kiribati
 
@@ -2441,6 +2707,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Kuwait
 
@@ -2467,6 +2736,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Kyrgyzstan
 
@@ -2493,6 +2765,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Laos
 
@@ -2519,6 +2794,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Latvia
 
@@ -2545,6 +2823,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Lebanon
 
@@ -2571,6 +2852,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Lesotho
 
@@ -2597,6 +2881,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Liberia
 
@@ -2623,6 +2910,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Libya
 
@@ -2649,6 +2939,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Liechtenstein
 
@@ -2675,6 +2968,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Lithuania
 
@@ -2701,6 +2997,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Luxembourg
 
@@ -2727,6 +3026,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Madagascar
 
@@ -2753,6 +3055,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Malawi
 
@@ -2779,6 +3084,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Malaysia
 
@@ -2805,6 +3113,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Maldives
 
@@ -2831,6 +3142,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Mali
 
@@ -2857,6 +3171,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Malta
 
@@ -2883,6 +3200,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Marshall Islands
 
@@ -2909,6 +3229,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Mauritania
 
@@ -2935,6 +3258,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Mauritius
 
@@ -2961,6 +3287,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Mexico
 
@@ -2987,6 +3316,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Micronesia
 
@@ -3013,6 +3345,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Moldova
 
@@ -3039,6 +3374,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Monaco
 
@@ -3065,6 +3403,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Mongolia
 
@@ -3091,6 +3432,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Montenegro
 
@@ -3117,6 +3461,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Morocco
 
@@ -3143,6 +3490,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Mozambique
 
@@ -3169,6 +3519,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Myanmar
 
@@ -3195,6 +3548,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Namibia
 
@@ -3221,6 +3577,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Nauru
 
@@ -3247,6 +3606,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Nepal
 
@@ -3273,6 +3635,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Netherlands
 
@@ -3299,6 +3664,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### New Zealand
 
@@ -3325,6 +3693,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Nicaragua
 
@@ -3351,6 +3722,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Niger
 
@@ -3377,6 +3751,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Nigeria
 
@@ -3403,6 +3780,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### North Korea
 
@@ -3429,6 +3809,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### North Macedonia
 
@@ -3455,6 +3838,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Norway
 
@@ -3481,6 +3867,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Oman
 
@@ -3507,6 +3896,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Pakistan
 
@@ -3533,6 +3925,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Palau
 
@@ -3559,6 +3954,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Panama
 
@@ -3585,6 +3983,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Papua New Guinea
 
@@ -3611,6 +4012,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Paraguay
 
@@ -3637,6 +4041,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Peru
 
@@ -3663,6 +4070,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Philippines
 
@@ -3689,6 +4099,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Poland
 
@@ -3715,6 +4128,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Portugal
 
@@ -3741,6 +4157,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Qatar
 
@@ -3767,6 +4186,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Romania
 
@@ -3793,6 +4215,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Russia
 
@@ -3819,6 +4244,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Rwanda
 
@@ -3845,6 +4273,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Saint Kitts and Nevis
 
@@ -3871,6 +4302,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Saint Lucia
 
@@ -3897,6 +4331,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Saint Vincent and the Grenadines
 
@@ -3923,6 +4360,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Samoa
 
@@ -3949,6 +4389,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### San Marino
 
@@ -3975,6 +4418,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Sao Tome and Principe
 
@@ -4001,6 +4447,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Saudi Arabia
 
@@ -4027,6 +4476,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Senegal
 
@@ -4053,6 +4505,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Serbia
 
@@ -4079,6 +4534,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Seychelles
 
@@ -4105,6 +4563,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Sierra Leone
 
@@ -4131,6 +4592,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Singapore
 
@@ -4157,6 +4621,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Slovakia
 
@@ -4183,6 +4650,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Slovenia
 
@@ -4209,6 +4679,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Solomon Islands
 
@@ -4235,6 +4708,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Somalia
 
@@ -4261,6 +4737,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### South Africa
 
@@ -4287,6 +4766,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### South Korea
 
@@ -4313,6 +4795,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### South Sudan
 
@@ -4339,6 +4824,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Spain
 
@@ -4365,6 +4853,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Sri Lanka
 
@@ -4391,6 +4882,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Sudan
 
@@ -4417,6 +4911,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Suriname
 
@@ -4443,6 +4940,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Sweden
 
@@ -4469,6 +4969,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Switzerland
 
@@ -4495,6 +4998,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Syria
 
@@ -4521,6 +5027,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Taiwan
 
@@ -4547,6 +5056,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Tajikistan
 
@@ -4573,6 +5085,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Tanzania
 
@@ -4599,6 +5114,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Thailand
 
@@ -4625,6 +5143,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Timor-Leste
 
@@ -4651,6 +5172,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Togo
 
@@ -4677,6 +5201,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Tonga
 
@@ -4703,6 +5230,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Trinidad and Tobago
 
@@ -4729,6 +5259,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Tunisia
 
@@ -4755,6 +5288,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Turkey
 
@@ -4781,6 +5317,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Turkmenistan
 
@@ -4807,6 +5346,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Tuvalu
 
@@ -4833,6 +5375,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Uganda
 
@@ -4859,6 +5404,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Ukraine
 
@@ -4885,6 +5433,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### United Arab Emirates
 
@@ -4911,6 +5462,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### United Kingdom
 
@@ -4937,10 +5491,13 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### United States
 
-- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (see tagged cells).
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (tagged cells).
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4963,6 +5520,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | >900 AWA members [S23] | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Uruguay
 
@@ -4989,6 +5549,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Uzbekistan
 
@@ -5015,6 +5578,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Vanuatu
 
@@ -5041,6 +5607,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Vatican City
 
@@ -5067,6 +5636,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Venezuela
 
@@ -5093,6 +5665,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Vietnam
 
@@ -5119,6 +5694,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Yemen
 
@@ -5145,6 +5723,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Zambia
 
@@ -5171,6 +5752,9 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ### Zimbabwe
 
@@ -5197,7 +5781,10 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 
 ---
 
-*Definitions (§1–§2) and sources (§6) are authoritative. Tagged cells in §7 are the real published figures found in an exhaustive source sweep; all `NR*` cells are genuinely unreported (no Wagyu-specific per-country/per-year data is published, and page fetches were blocked in this environment). Populate further only from a reviewed data feed, never by hand-estimation.*
+*The Wagyu Intrinsic Series (§2) is canonical: 19 core + 3 extension = 22 points, indexed by (country, year) over 2002–2026. Definitions (§1–§2) and sources (§6) are authoritative; tagged cells are the real published figures; all `NR*` cells are genuinely unreported and to be populated later from a reviewed data feed, never by hand-estimation.*
