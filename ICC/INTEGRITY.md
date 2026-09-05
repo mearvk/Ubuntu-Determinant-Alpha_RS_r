@@ -100,7 +100,61 @@ signed certificate/receipt, and commit it here.
 > OpenTimestamps/Bitcoin route gives a decentralized, publicly-verifiable proof.
 > Either can be recorded in §5. The SHA-256 in §2 is what they all attest to.
 
-## 5. Third-party timestamp proofs (to be filled after §4)
+## 5. Timestamping options & standards (international communicators / series)
+
+Trusted timestamping over signed documents is internationally standardised. The
+options below all attest to the **same SHA-256 digests in §2** — choose by the
+level of legal recognition you need. Confirm current provider details with each
+provider before relying on them.
+
+### 5.1 RFC 3161 — Time-Stamp Protocol (the international technical standard)
+The IETF standard (RFC 3161) for a **Time-Stamping Authority (TSA)** that returns
+a cryptographically **signed timestamp token** over a document hash. Widely used
+in PKI, code signing, and PDF signing.
+- Free/public TSA: **FreeTSA** (`freetsa.org`).
+- Commercial TSAs: **DigiCert, Sectigo, GlobalSign, Entrust** (public CAs).
+- Token files are `.tsr` (reply) / `.tsq` (request); see §4B.
+
+### 5.2 eIDAS Qualified Electronic Time Stamp (QTS) — legal-grade, cross-border
+Under the EU **eIDAS Regulation**, a **Qualified Electronic Time Stamp** issued by
+a **Qualified Trust Service Provider (QTSP)** on the EU Trusted List carries a
+legal presumption of accuracy of its date/time and of data integrity, and is
+recognised across EU member states. This is the tier for legally-oriented,
+court-relevant, cross-border use. It pairs with **qualified electronic signatures
+(QES)** for fully signed + sealed + timestamped documents.
+- QTSPs include (verify on the EU Trusted List): **DigiCert (QuoVadis),
+  GlobalSign, Sectigo, InfoCert, Namirial, D-Trust (Bundesdruckerei)**.
+
+### 5.3 OpenTimestamps — free, decentralised, blockchain-anchored
+`opentimestamps.org` anchors a document hash into the **Bitcoin blockchain**;
+proofs are independently verifiable by anyone, with no trusted third party. Strong
+tamper-evident public evidence (not a legal notary by itself). See §4A.
+
+### 5.4 Notarisation / e-signature platforms (end-to-end signed documents)
+For sign + seal + timestamp + audit trail on the document itself: **DocuSign,
+Adobe Acrobat Sign, Dropbox Sign** — these apply RFC 3161 / eIDAS-grade
+timestamps within the signing workflow and produce an audit certificate.
+
+### 5.5 Timestamp series / long-term evidence (the "series" you asked about)
+A single timestamp can be extended into a verifiable **series**:
+- **Timestamp linking/chaining** — a TSA can link each token to the previous one,
+  forming a chain that proves tokens cannot be back-dated.
+- **Re-stamping** — before a hash algorithm or a TSA certificate weakens/expires,
+  re-timestamp the document (and prior tokens) to extend validity forward.
+- **ERS — Evidence Record Syntax (IETF RFC 4998 / RFC 6283)** — the standard for
+  **long-term archival of a series of timestamps** (renewable timestamp chains and
+  hash-tree renewal), designed exactly for documents that must stay verifiable for
+  years/decades.
+- **OpenTimestamps `upgrade`** — a natural two-stage series: a *pending* proof that
+  is later *upgraded* to a Bitcoin-confirmed proof.
+
+**Recommendation for these ICC documents:** obtain an **eIDAS Qualified Timestamp
+(§5.2)** for the legal tier **and** an **OpenTimestamps (§5.3)** proof as a free,
+permanent, independently-verifiable backup; for long-term retention, renew as an
+**ERS series (§5.5)**. Record whatever is obtained in §6 and commit the proof
+files into `ICC/`.
+
+## 6. Third-party timestamp proofs (to be filled after §4 / §5)
 
 > Paste the returned proof(s) here, and commit the token files
 > (`*.ots`, `*.tsr`, or the service's certificate) into `ICC/`.
@@ -113,7 +167,7 @@ signed certificate/receipt, and commit it here.
 
 ---
 
-*Integrity digests are authoritative for the exact bytes hashed. Third-party
-timestamping is pending an online service (see §4); no timestamp has been
-fabricated. Not legal advice; placement here asserts no official ICC status.
-Max Rupplin — MEARVK LLC — 2026.*
+*Integrity digests are authoritative for the exact bytes hashed. Timestamping
+options and standards are documented in §5; a third-party timestamp is pending an
+online service (see §4) and no timestamp has been fabricated. Not legal advice;
+placement here asserts no official ICC status. Max Rupplin — MEARVK LLC — 2026.*
