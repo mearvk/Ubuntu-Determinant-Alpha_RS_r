@@ -31,7 +31,7 @@
 > relying on them, verify against a live capture using §2 and confirm the fetched
 > key/fingerprint match exactly.
 
-##Disney's Public RSA
+## Disney's Public RSA
 
 43 F8 07 14 20 CA 9C 3A FB 3E A9 13 55 FC C2 54
 83 40 CC 45 DF 8F 8D E1 C5 57 A4 08 87 DA 7A 83
