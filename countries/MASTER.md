@@ -41,17 +41,17 @@ Archive build: 2026-09-05.
 | 29 | Cabo Verde | Africa | ✅ Pulled | `national/cabo-verde/`; small state — sparse coverage expected. Partial: INE Cabo Verde |
 | 30 | Cambodia | Asia | ✅ Pulled | `national/cambodia/`; Partial: NIS |
 | 31 | Cameroon | Africa | ✅ Pulled | `national/cameroon/`; Partial: INS Cameroon |
-| 32 | Canada | Americas | ⬜ Not started | |
-| 33 | Central African Republic | Africa | ⬜ Not started | |
-| 34 | Chad | Africa | ⬜ Not started | |
-| 35 | Chile | Americas | ⬜ Not started | |
+| 32 | Canada | Americas | ✅ Pulled | `national/canada/`; Partial: Statistics Canada |
+| 33 | Central African Republic | Africa | ✅ Pulled | `national/central-african-republic/`; Partial: ICASEES |
+| 34 | Chad | Africa | ✅ Pulled | `national/chad/`; Partial: INSEED |
+| 35 | Chile | Americas | ✅ Pulled | `national/chile/`; Partial: INE Chile |
 | 36 | China | Asia | ✅ Pulled | Directory `national/china/` |
-| 37 | Colombia | Americas | ⬜ Not started | |
-| 38 | Comoros | Africa | ⬜ Not started | |
-| 39 | Congo (Republic) | Africa | ⬜ Not started | |
-| 40 | Congo (DRC) | Africa | ⬜ Not started | |
-| 41 | Costa Rica | Americas | ⬜ Not started | |
-| 42 | Côte d'Ivoire | Africa | ⬜ Not started | |
+| 37 | Colombia | Americas | ✅ Pulled | `national/colombia/`; Partial: DANE |
+| 38 | Comoros | Africa | ✅ Pulled | `national/comoros/`; small state — sparse coverage expected. Partial: INSEED Comoros |
+| 39 | Congo (Republic) | Africa | ✅ Pulled | `national/congo-republic/`; FAOSTAT entity "Congo". Partial: INS Congo |
+| 40 | Congo (DRC) | Africa | ✅ Pulled | `national/congo-drc/`; FAOSTAT entity "Democratic Republic of the Congo". Partial: INS RDC |
+| 41 | Costa Rica | Americas | ✅ Pulled | `national/costa-rica/`; Partial: INEC |
+| 42 | Côte d'Ivoire | Africa | ✅ Pulled | `national/cote-divoire/`; Partial: INS Côte d'Ivoire |
 | 43 | Croatia | Europe | ⬜ Not started | |
 | 44 | Cuba | Americas | ⬜ Not started | |
 | 45 | Cyprus | Asia | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 34 — through Cameroon alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Cameroon). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
-- **Remaining (⬜):** 163
+- **Data pulled (✅):** 44 — through Côte d'Ivoire alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Côte d'Ivoire). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
+- **Remaining (⬜):** 153
 
 ## Sources
 
@@ -270,6 +270,16 @@ These international families are reproducible baselines used across countries by
 | Cabo Verde | INE Cabo Verde | PARTIAL | small state; sparse coverage expected |
 | Cambodia | NIS | PARTIAL | see `national/cambodia/DATA_SOURCES.md` |
 | Cameroon | INS Cameroon | PARTIAL | see `national/cameroon/DATA_SOURCES.md` |
+| Canada | Statistics Canada | PARTIAL | see `national/canada/DATA_SOURCES.md` |
+| Central African Republic | ICASEES | PARTIAL | see `national/central-african-republic/DATA_SOURCES.md` |
+| Chad | INSEED | PARTIAL | see `national/chad/DATA_SOURCES.md` |
+| Chile | INE Chile | PARTIAL | see `national/chile/DATA_SOURCES.md` |
+| Colombia | DANE | PARTIAL | see `national/colombia/DATA_SOURCES.md` |
+| Comoros | INSEED Comoros | PARTIAL | small state; sparse coverage expected |
+| Congo (Republic) | INS Congo | PARTIAL | FAOSTAT entity "Congo" |
+| Congo (DRC) | INS RDC | PARTIAL | FAOSTAT entity "Democratic Republic of the Congo" |
+| Costa Rica | INEC | PARTIAL | see `national/costa-rica/DATA_SOURCES.md` |
+| Côte d'Ivoire | INS Côte d'Ivoire | PARTIAL | see `national/cote-divoire/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
