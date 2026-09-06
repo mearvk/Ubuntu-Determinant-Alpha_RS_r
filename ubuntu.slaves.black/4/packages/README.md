@@ -37,7 +37,6 @@ language dictionaries, and OEM enablement meta-packages.
 
 | Rank | Software | Years developed | Software house | Age of expertise | Relative value | Importance (0–83) | Improve | Description |
 |-----:|---------|-----------------|----------------|-----------------:|----------------|:-----------------:|---------|-------------|
-
 | 1 | **openssl** | 1998 | OpenSSL Project | 28 | High | 72 | High — foundational; changes need strong evidence and review | OpenSSL — TLS/crypto toolkit and library |
 | 2 | **openssh** | 1999 | OpenBSD project | 27 | High | 70 | High — foundational; changes need strong evidence and review | OpenSSH — secure shell client/server |
 | 3 | **make-dfsg** | 1988 | GNU Project | 38 | High | 68 | Medium — meaningful integration/hardening value | GNU Make build automation tool |
