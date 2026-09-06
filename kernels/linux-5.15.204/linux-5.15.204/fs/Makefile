@@ -145,3 +145,6 @@ obj-$(CONFIG_PCOPY)		+= pcopy/
 
 # PMOVE - Parallel Copy/Move (NVMe Multi-Queue & PCIe Lane Aware)
 obj-$(CONFIG_PMOVE)		+= pmove/
+
+# NTUPLE - N-way Redundant File Table (Wear/Pressure/Health, Tables 1/2/3)
+obj-$(CONFIG_NTUPLE)		+= ntuple/
