@@ -77,7 +77,7 @@ in `git/` (a `<op>.h` contract plus C and C++ companions), a metadoc, and a
 block in `GIT_OPERATIONS.logic`. The current operation set is:
 
 ```
-premount, add, commit, push, resume, merge, rebase, restage, autocheck, moral, temperature
+premount, add, commit, push, resume, merge, rebase, restage, autocheck, moral, temperature, alter-comment
 ```
 
 Highlights:
@@ -93,6 +93,9 @@ Highlights:
 - **autocheck / restage / merge / rebase / moral** — pull-then-prepare,
   two-level index history, future-base merge metadata, schedule-relative rebase
   metadata, and the symbolic blessing operation, respectively.
+- **alter-comment** — `git alter-comment X "message"` alters only the messages
+  of the last `X` commits, addressed by an integer count; trees, authorship, and
+  dates are preserved (`alter-comment.h`, see `ALTER_COMMENT.md`).
 
 ## Native push policy
 
@@ -261,5 +264,6 @@ prevents an oversized push effort from being attempted.
 | `RESTAGE.md` | two-level restage / index history |
 | `REBASE_METADOC.md` / `REBASE_MERGE_METADOC.md` | rebase / merge metadata |
 | `MORAL.md` | symbolic blessing operation |
+| `ALTER_COMMENT.md` | integer-addressed commit-message alteration |
 | `FOUNDING.md`, `EXPLANATIONS.md` | project rationale and detailed notes |
 | `GIT_OPERATIONS.logic` | the line-oriented operation contract |

@@ -2,7 +2,7 @@
 # UTF-8 plain text, line-oriented .logic contract
 
 LOGIC-VERSION: 1
-OPERATIONS: premount,add,commit,push,resume,merge,rebase,restage,autocheck,moral,temperature
+OPERATIONS: premount,add,commit,push,resume,merge,rebase,restage,autocheck,moral,temperature,alter-comment
 
 [ORIGINAL]
 RULE: Preserve each operation's ordinary Git file and history semantics.
@@ -127,6 +127,18 @@ SCALE: All strips are integers on a fixed 0..100 scale; achievable-value and tot
 FAIRNESS: Scores are never inferred from author identity, appearance, IQ, or credentials; only from observable project signals.
 RULE: temperature is advisory and read-only; it performs no staging, commit, or transport and never gates any Git operation.
 PROVENANCE: Preserve author, committer, date, timestamp, parent and relevant object references when a record is emitted.
+
+[ALTER-COMMENT]
+METHOD: Integer-addressed commit-message alteration: `git alter-comment X "message"` alters only the messages of the last X commits.
+COUNT: X is a positive integer; X == 1 addresses the tip alone, X > 1 addresses a deterministic linear range of the last X commits.
+SCOPE: Only the human-readable commit message changes; trees, file content, authorship, dates, and commit order are preserved.
+REWRITE: Because the message is part of the commit object, altering it produces new object IDs for each addressed commit and its descendants; this is ordinary Git message-edit rewriting, and Git's resulting rewritten graph remains authoritative.
+RANGE: X must not exceed the commits reachable on the selected linear history; addressing more commits than exist is a planning error, never a silent clamp.
+MESSAGE: A non-empty replacement message is required; an empty or absent message is rejected rather than blanked or invented.
+LINEAR: The addressed range must be a deterministic linear history; arbitrary DAG descendant selection across a merge is not permitted.
+PROVENANCE: Preserve author, committer, date, timestamp, parent object, and relevant object references; record prior operation when chained.
+OVERFLOW: Rewrite-count arithmetic rejects integer overflow rather than wrapping.
+RULE: alter-comment changes messages only; it never adds, removes, or reorders commits, and it never rewrites history it was not explicitly asked to address.
 
 [CHAIN]
 RULE: Every operation may record PRIOR-OPERATION and PARENT-COMMIT.
