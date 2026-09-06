@@ -15,10 +15,10 @@
 | Maize production | N/A | tonnes | FAO via Our World in Data |
 | wheat area harvested | 646231.000000 | ha | FAOSTAT QCL |
 | rice area harvested | 70470.000000 | ha | FAOSTAT QCL |
-| maize area harvested | 68378.000000 | ha | FAOSTAT QCL |
+| maize area harvested | 7294842.000000 | ha | FAOSTAT QCL |
 | wheat yield | 5227.400000 | kg/ha | FAOSTAT QCL |
 | rice yield | 4785.700000 | kg/ha | FAOSTAT QCL |
-| maize yield | 9480.200000 | kg/ha | FAOSTAT QCL |
+| maize yield | 3001.200000 | kg/ha | FAOSTAT QCL |
 | cattle stock | 31163124.000000 | An | FAOSTAT QCL |
 | sheep stock | 7287446.000000 | An | FAOSTAT QCL |
 | goats stock | 8890384.000000 | An | FAOSTAT QCL |

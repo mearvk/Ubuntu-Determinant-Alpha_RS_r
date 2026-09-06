@@ -15,10 +15,10 @@
 | Maize production | N/A | tonnes | FAO via Our World in Data |
 | wheat area harvested | 547779.000000 | ha | FAOSTAT QCL |
 | rice area harvested | 40280.000000 | ha | FAOSTAT QCL |
-| maize area harvested | 68937.000000 | ha | FAOSTAT QCL |
+| maize area harvested | 7139621.000000 | ha | FAOSTAT QCL |
 | wheat yield | 5994.400000 | kg/ha | FAOSTAT QCL |
 | rice yield | 6381.300000 | kg/ha | FAOSTAT QCL |
-| maize yield | 15365.600000 | kg/ha | FAOSTAT QCL |
+| maize yield | 3852.200000 | kg/ha | FAOSTAT QCL |
 
 ## Source notes
 - INEGI (Instituto Nacional de Estadistica y Geografia) is the preferred national primary family for table-level replacement or supplementation where an equivalent series exists.
