@@ -83,16 +83,16 @@ Archive build: 2026-09-05.
 | 71 | Guinea | Africa | ✅ Pulled | `national/guinea/`; Partial: INS Guinea |
 | 72 | Guinea-Bissau | Africa | ✅ Pulled | `national/guinea-bissau/`; small state — sparse coverage expected. Partial: INE Guinea-Bissau |
 | 73 | Guyana | Americas | ✅ Pulled | `national/guyana/`; small state — sparse coverage expected. Partial: Bureau of Statistics |
-| 74 | Haiti | Americas | ⬜ Not started | |
-| 75 | Honduras | Americas | ⬜ Not started | |
-| 76 | Hungary | Europe | ⬜ Not started | |
-| 77 | Iceland | Europe | ⬜ Not started | |
-| 78 | India | Asia | ⬜ Not started | |
-| 79 | Indonesia | Asia | ⬜ Not started | |
-| 80 | Iran | Asia | ⬜ Not started | |
-| 81 | Iraq | Asia | ⬜ Not started | |
-| 82 | Ireland | Europe | ⬜ Not started | |
-| 83 | Israel | Asia | ⬜ Not started | |
+| 74 | Haiti | Americas | ✅ Pulled | `national/haiti/`; Partial: IHSI |
+| 75 | Honduras | Americas | ✅ Pulled | `national/honduras/`; Partial: INE Honduras |
+| 76 | Hungary | Europe | ✅ Pulled | `national/hungary/`; Partial: KSH |
+| 77 | Iceland | Europe | ✅ Pulled | `national/iceland/`; small state — sparse coverage expected. Partial: Statistics Iceland |
+| 78 | India | Asia | ✅ Pulled | `national/india/`; Partial: MoSPI/NSO |
+| 79 | Indonesia | Asia | ✅ Pulled | `national/indonesia/`; Partial: BPS |
+| 80 | Iran | Asia | ✅ Pulled | `national/iran/`; FAOSTAT entity "Iran (Islamic Republic of)". Partial: SCI |
+| 81 | Iraq | Asia | ✅ Pulled | `national/iraq/`; Partial: CSO/COSIT |
+| 82 | Ireland | Europe | ✅ Pulled | `national/ireland/`; Partial: CSO Ireland |
+| 83 | Israel | Asia | ✅ Pulled | `national/israel/`; Partial: CBS Israel |
 | 84 | Italy | Europe | ⬜ Not started | |
 | 85 | Jamaica | Americas | ⬜ Not started | |
 | 86 | Japan | Asia | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 74 — through Guyana alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Guyana). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
-- **Remaining (⬜):** 123
+- **Data pulled (✅):** 84 — through Israel alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Israel). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
+- **Remaining (⬜):** 113
 
 ## Sources
 
@@ -310,6 +310,16 @@ These international families are reproducible baselines used across countries by
 | Guinea | INS Guinea | PARTIAL | see `national/guinea/DATA_SOURCES.md` |
 | Guinea-Bissau | INE Guinea-Bissau | PARTIAL | small state; sparse coverage expected |
 | Guyana | Bureau of Statistics Guyana | PARTIAL | small state; sparse coverage expected |
+| Haiti | IHSI | PARTIAL | see `national/haiti/DATA_SOURCES.md` |
+| Honduras | INE Honduras | PARTIAL | see `national/honduras/DATA_SOURCES.md` |
+| Hungary | KSH | PARTIAL | see `national/hungary/DATA_SOURCES.md` |
+| Iceland | Statistics Iceland | PARTIAL | small state; sparse coverage expected |
+| India | MoSPI/NSO | PARTIAL | see `national/india/DATA_SOURCES.md` |
+| Indonesia | BPS | PARTIAL | see `national/indonesia/DATA_SOURCES.md` |
+| Iran | SCI | PARTIAL | FAOSTAT entity "Iran (Islamic Republic of)" |
+| Iraq | CSO/COSIT | PARTIAL | see `national/iraq/DATA_SOURCES.md` |
+| Ireland | CSO Ireland | PARTIAL | see `national/ireland/DATA_SOURCES.md` |
+| Israel | CBS Israel | PARTIAL | see `national/israel/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
