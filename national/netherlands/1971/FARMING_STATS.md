@@ -13,16 +13,16 @@
 | Wheat production | N/A | tonnes | FAO via Our World in Data |
 | Rice production | N/A | tonnes | FAO via Our World in Data |
 | Maize production | N/A | tonnes | FAO via Our World in Data |
-| wheat area harvested | N/A | N/A | FAOSTAT QCL |
-| rice area harvested | N/A | N/A | FAOSTAT QCL |
-| maize area harvested | N/A | N/A | FAOSTAT QCL |
-| wheat yield | N/A | N/A | FAOSTAT QCL |
+| wheat area harvested | 142048.000000 | ha | FAOSTAT QCL |
+| rice area harvested | N/A | ha | FAOSTAT QCL |
+| maize area harvested | 2254.000000 | ha | FAOSTAT QCL |
+| wheat yield | 4968.700000 | kg/ha | FAOSTAT QCL |
 | rice yield | N/A | N/A | FAOSTAT QCL |
-| maize yield | N/A | N/A | FAOSTAT QCL |
-| cattle stock | N/A | N/A | FAOSTAT QCL |
-| sheep stock | N/A | N/A | FAOSTAT QCL |
-| goats stock | N/A | N/A | FAOSTAT QCL |
-| pigs stock | N/A | N/A | FAOSTAT QCL |
+| maize yield | 4880.200000 | kg/ha | FAOSTAT QCL |
+| cattle stock | 3465000.000000 | An | FAOSTAT QCL |
+| sheep stock | 572153.000000 | An | FAOSTAT QCL |
+| goats stock | 18000.000000 | An | FAOSTAT QCL |
+| pigs stock | 6158472.000000 | An | FAOSTAT QCL |
 
 ## Source notes
 - CBS (Statistics Netherlands) is the preferred national primary family for table-level replacement or supplementation where an equivalent series exists.

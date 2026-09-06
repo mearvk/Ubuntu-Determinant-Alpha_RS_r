@@ -13,12 +13,12 @@
 | Wheat production | N/A | tonnes | FAO via Our World in Data |
 | Rice production | N/A | tonnes | FAO via Our World in Data |
 | Maize production | N/A | tonnes | FAO via Our World in Data |
-| wheat area harvested | N/A | N/A | FAOSTAT QCL |
-| rice area harvested | N/A | N/A | FAOSTAT QCL |
-| maize area harvested | N/A | N/A | FAOSTAT QCL |
-| wheat yield | N/A | N/A | FAOSTAT QCL |
+| wheat area harvested | 140603.000000 | ha | FAOSTAT QCL |
+| rice area harvested | N/A | ha | FAOSTAT QCL |
+| maize area harvested | 3300.000000 | ha | FAOSTAT QCL |
+| wheat yield | 7652.800000 | kg/ha | FAOSTAT QCL |
 | rice yield | N/A | N/A | FAOSTAT QCL |
-| maize yield | N/A | N/A | FAOSTAT QCL |
+| maize yield | 9090.900000 | kg/ha | FAOSTAT QCL |
 
 ## Source notes
 - CBS (Statistics Netherlands) is the preferred national primary family for table-level replacement or supplementation where an equivalent series exists.

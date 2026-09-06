@@ -11,7 +11,7 @@
 
 | Indicator | Value | Unit | Source |
 |---|---:|---|---|
-| Fruit production | N/A | N/A | FAOSTAT QCL |
+| Fruit production | N/A | t | FAOSTAT QCL |
 
 ## Source notes
 - CBS (Statistics Netherlands) is the preferred national primary family for table-level replacement or supplementation where an equivalent series exists.

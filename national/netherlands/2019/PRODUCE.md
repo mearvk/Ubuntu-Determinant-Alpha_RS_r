@@ -12,8 +12,8 @@
 | soybean production t | N/A | N/A | FAOSTAT QCL |
 | sugar cane production t | N/A | N/A | FAOSTAT QCL |
 | cassava production t | N/A | N/A | FAOSTAT QCL |
-| vegetables production t | N/A | N/A | FAOSTAT QCL |
-| fruit production t | N/A | N/A | FAOSTAT QCL |
+| vegetables production t | 92370.000000 | t | FAOSTAT QCL |
+| fruit production t | 0.000000 | t | FAOSTAT QCL |
 
 ## Source notes
 - CBS (Statistics Netherlands) is the preferred national primary family for table-level replacement or supplementation where an equivalent series exists.

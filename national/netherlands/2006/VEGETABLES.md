@@ -9,7 +9,7 @@
 
 | Indicator | Value | Unit | Source |
 |---|---:|---|---|
-| Vegetables production | N/A | N/A | FAOSTAT QCL |
+| Vegetables production | 102000.000000 | t | FAOSTAT QCL |
 
 ## Source notes
 - CBS (Statistics Netherlands) is the preferred national primary family for table-level replacement or supplementation where an equivalent series exists.

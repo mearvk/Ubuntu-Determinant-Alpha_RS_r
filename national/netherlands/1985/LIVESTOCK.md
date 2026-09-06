@@ -9,10 +9,10 @@
 
 | Indicator | Value | Unit | Source |
 |---|---:|---|---|
-| cattle stock | N/A | N/A | FAOSTAT QCL |
-| sheep stock | N/A | N/A | FAOSTAT QCL |
-| goats stock | N/A | N/A | FAOSTAT QCL |
-| pigs stock | N/A | N/A | FAOSTAT QCL |
+| cattle stock | 5247651.000000 | An | FAOSTAT QCL |
+| sheep stock | 814342.000000 | An | FAOSTAT QCL |
+| goats stock | 34000.000000 | An | FAOSTAT QCL |
+| pigs stock | 12382600.000000 | An | FAOSTAT QCL |
 | cow milk production t | N/A | N/A | FAOSTAT QCL |
 | eggs production t | N/A | N/A | FAOSTAT QCL |
 
