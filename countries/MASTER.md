@@ -93,17 +93,17 @@ Archive build: 2026-09-05.
 | 81 | Iraq | Asia | ✅ Pulled | `national/iraq/`; Partial: CSO/COSIT |
 | 82 | Ireland | Europe | ✅ Pulled | `national/ireland/`; Partial: CSO Ireland |
 | 83 | Israel | Asia | ✅ Pulled | `national/israel/`; Partial: CBS Israel |
-| 84 | Italy | Europe | ⬜ Not started | |
-| 85 | Jamaica | Americas | ⬜ Not started | |
-| 86 | Japan | Asia | ⬜ Not started | |
-| 87 | Jordan | Asia | ⬜ Not started | |
-| 88 | Kazakhstan | Asia | ⬜ Not started | |
-| 89 | Kenya | Africa | ⬜ Not started | |
-| 90 | Kiribati | Oceania | ⬜ Not started | |
+| 84 | Italy | Europe | ✅ Pulled | `national/italy/`; Partial: ISTAT |
+| 85 | Jamaica | Americas | ✅ Pulled | `national/jamaica/`; small state — sparse coverage expected. Partial: STATIN |
+| 86 | Japan | Asia | ✅ Pulled | `national/japan/`; Partial: Statistics Bureau of Japan |
+| 87 | Jordan | Asia | ✅ Pulled | `national/jordan/`; Partial: DoS Jordan |
+| 88 | Kazakhstan | Asia | ✅ Pulled | `national/kazakhstan/`; Partial: Bureau of National Statistics |
+| 89 | Kenya | Africa | ✅ Pulled | `national/kenya/`; Partial: KNBS |
+| 90 | Kiribati | Oceania | ✅ Pulled | `national/kiribati/`; small state — sparse coverage expected. Partial: Kiribati NSO |
 | 91 | Korea (North & South) | Asia | ✅ Pulled | Directory `national/korea/`; data pulled is Republic of Korea (South). North Korea (DPRK) not yet pulled |
-| 92 | Kosovo | Europe | ⬜ Not started | Partially recognized |
-| 93 | Kuwait | Asia | ⬜ Not started | |
-| 94 | Kyrgyzstan | Asia | ⬜ Not started | |
+| 92 | Kosovo | Europe | ✅ Pulled | `national/kosovo/`; partially recognized — no FAOSTAT entity, so WDI-only (crop cells `N/A`). Partial: ASK |
+| 93 | Kuwait | Asia | ✅ Pulled | `national/kuwait/`; small/desert economy — sparse agriculture. Partial: CSB Kuwait |
+| 94 | Kyrgyzstan | Asia | ✅ Pulled | `national/kyrgyzstan/`; Partial: Natstatcom |
 | 95 | Laos | Asia | ⬜ Not started | |
 | 96 | Latvia | Europe | ⬜ Not started | |
 | 97 | Lebanon | Asia | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 84 — through Israel alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Israel). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
-- **Remaining (⬜):** 113
+- **Data pulled (✅):** 94 — through Kyrgyzstan alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Kyrgyzstan). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo) expectedly sparse.
+- **Remaining (⬜):** 103
 
 ## Sources
 
@@ -320,6 +320,16 @@ These international families are reproducible baselines used across countries by
 | Iraq | CSO/COSIT | PARTIAL | see `national/iraq/DATA_SOURCES.md` |
 | Ireland | CSO Ireland | PARTIAL | see `national/ireland/DATA_SOURCES.md` |
 | Israel | CBS Israel | PARTIAL | see `national/israel/DATA_SOURCES.md` |
+| Italy | ISTAT | PARTIAL | see `national/italy/DATA_SOURCES.md` |
+| Jamaica | STATIN | PARTIAL | small state; sparse coverage expected |
+| Japan | Statistics Bureau of Japan | PARTIAL | see `national/japan/DATA_SOURCES.md` |
+| Jordan | DoS Jordan | PARTIAL | see `national/jordan/DATA_SOURCES.md` |
+| Kazakhstan | Bureau of National Statistics | PARTIAL | see `national/kazakhstan/DATA_SOURCES.md` |
+| Kenya | KNBS | PARTIAL | see `national/kenya/DATA_SOURCES.md` |
+| Kiribati | Kiribati NSO | PARTIAL | small state; sparse coverage expected |
+| Kosovo | ASK | PARTIAL | no FAOSTAT entity; WDI-only, crop cells `N/A` |
+| Kuwait | CSB Kuwait | PARTIAL | desert economy; sparse agriculture |
+| Kyrgyzstan | Natstatcom | PARTIAL | see `national/kyrgyzstan/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
