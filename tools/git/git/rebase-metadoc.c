@@ -9,7 +9,14 @@
 #include "git-compat-util.h"
 #include "rebase-metadoc.h"
 
-int git_rebase_metadoc_is_schedule_relative(const struct git_rebase_metadoc *doc)
+/*
+ * Stricter, non-empty-checking refinement of the header's inline
+ * git_rebase_metadoc_is_schedule_relative() predicate. Renamed with a
+ * "_strict" suffix so it coexists with the inline contract rather than
+ * redefining it.
+ */
+int git_rebase_metadoc_is_schedule_relative_strict(
+	const struct git_rebase_metadoc *doc)
 {
 	if (!doc)
 		return 0;
@@ -22,7 +29,7 @@ int git_rebase_metadoc_has_required_metadata(const struct git_rebase_metadoc *do
 {
 	if (!doc || !doc->date || !doc->timestamp)
 		return 0;
-	if (!git_rebase_metadoc_is_schedule_relative(doc))
+	if (!git_rebase_metadoc_is_schedule_relative_strict(doc))
 		return 0;
 	return doc->director_id && doc->director_id[0] &&
 		doc->seat && doc->seat[0] &&

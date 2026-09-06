@@ -16,10 +16,14 @@
 #ifndef GIT_COMMIT_BUDGET_H
 #define GIT_COMMIT_BUDGET_H
 
+#ifdef __cplusplus
+#include <cstdint>
+#include <cinttypes>
+#else
 #include "git-compat-util.h"
-
 #include <stdint.h>
 #include <inttypes.h>
+#endif
 
 #define GIT_COMMIT_PART_BYTES ((uintmax_t)50 * 1024 * 1024)
 #define GIT_COMMIT_PUSH_PARTS 4U

@@ -4,7 +4,6 @@
  * The implementation uses the same C ABI and constants as commit-budget.c
  * so C++ translation units can participate without a second policy model.
  */
-#include "git-compat-util.h"
 #include "commit-budget.h"
 
 extern "C" int git_commit_part_plan_validate(

@@ -20,8 +20,20 @@
 #ifndef GIT_TEMPERATURE_H
 #define GIT_TEMPERATURE_H
 
+/*
+ * In C we use Git's compat layer. In C++ (the self-contained policy companion
+ * and any C++ consumer) git-compat-util.h is not C++-clean, so we pull only the
+ * fixed-width integer and size types directly. Either way uintmax_t / size_t
+ * and the standard string helpers are available.
+ */
+#ifdef __cplusplus
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#else
 #include "git-compat-util.h"
 #include <stdint.h>
+#endif
 
 /*
  * All learner-strip scores are on a fixed 0..100 integer scale so the output

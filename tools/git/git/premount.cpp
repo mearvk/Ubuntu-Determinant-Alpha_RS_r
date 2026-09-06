@@ -1,5 +1,10 @@
-/* C++ companion for the native premount policy. */
-#include "git-compat-util.h"
+/*
+ * C++ companion for the native premount policy.
+ *
+ * Self-contained: it does not include git-compat-util.h (not C++-clean in a
+ * standalone build); premount.h supplies the fixed-width and string helpers in
+ * C++ mode.
+ */
 #include "premount.h"
 
 extern "C" int git_premount_report_validate(

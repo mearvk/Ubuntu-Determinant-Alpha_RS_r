@@ -2,8 +2,12 @@
 #ifndef GIT_AUTOCHECK_H
 #define GIT_AUTOCHECK_H
 
+#ifdef __cplusplus
+#include <cstdint>
+#else
 #include "git-compat-util.h"
 #include <stdint.h>
+#endif
 
 enum git_autocheck_resolution {
 	GIT_AUTOCHECK_NO_CHANGE,

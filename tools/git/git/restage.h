@@ -2,8 +2,12 @@
 #ifndef GIT_RESTAGE_H
 #define GIT_RESTAGE_H
 
+#ifdef __cplusplus
+#include <cstdint>
+#else
 #include "git-compat-util.h"
 #include <stdint.h>
+#endif
 
 enum git_restage_direction {
 	GIT_RESTAGE_BACKWARD = -1,

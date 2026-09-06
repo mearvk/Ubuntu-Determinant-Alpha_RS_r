@@ -1,5 +1,4 @@
 /* C++ companion for the native operation relevance contract. */
-#include "git-compat-util.h"
 #include "operation-logic.h"
 
 extern "C" int git_operation_logic_validate(

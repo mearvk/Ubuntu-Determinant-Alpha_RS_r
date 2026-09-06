@@ -87,3 +87,35 @@ thermal band and a recandle marker), and closes with the repository totals.
 restricts the scan to projects idle at least that long. The strip inputs the
 shell derives (quality/intention and importance) are heuristic, observable
 signals; the native structures remain the contract a later builtin can adopt.
+
+## Running on Standard Git and the Edition Git
+
+`temperature` is designed to run identically under stock upstream Git and under
+the Ubuntu Determinant Edition Git.
+
+**Standard Git (any recent upstream; tested with 2.50.x).**
+Git dispatches an unknown subcommand `git <name>` to an executable
+`git-<name>` found on `PATH`. The repository ships `tools/git/git-temperature`,
+a small shim that locates the sibling `git-workflow.sh` and forwards to its
+`temperature` subcommand. To enable it:
+
+```sh
+# put the shim on PATH (symlink or copy)
+ln -s "$PWD/tools/git/git-temperature" ~/bin/git-temperature   # ~/bin on PATH
+git temperature --recandle                                     # now works
+```
+
+Invoked as `git temperature`, it scans the enclosing repository; a repository
+path may also be given explicitly as the first argument.
+
+**Edition Git (vendored native tree).**
+The operation is registered in `tools/git/git/command-list.txt` as an
+`ancillaryinterrogators` command, and its native policy source
+(`temperature.h/.c/.cpp`) is compiled by the native-policy build in
+`tools/git/build` (`make` / `make check`). The native header is C and C++
+clean: in C++ it pulls the fixed-width integer/size/string types directly
+rather than `git-compat-util.h`, so the C++ companion builds as an ordinary
+translation unit alongside the other policy modules.
+
+The behavior is identical across both editions; only the packaging differs
+(external shim vs. registered/compiled native module).

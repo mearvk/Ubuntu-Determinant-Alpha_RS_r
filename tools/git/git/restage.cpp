@@ -1,5 +1,4 @@
 /* C++ companion for the native restage/index-history contract. */
-#include "git-compat-util.h"
 #include "restage.h"
 
 extern "C" int git_restage_record_validate(const struct git_restage_record *record)

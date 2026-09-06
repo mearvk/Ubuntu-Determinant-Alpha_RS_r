@@ -3,8 +3,12 @@
  *
  * Same C ABI and constants as temperature.c so C++ translation units share one
  * assessment model. Advisory and read-only; performs no transport.
+ *
+ * This companion is intentionally self-contained: it pulls only the fixed-width
+ * integer and size types it needs, not git-compat-util.h, so it compiles as an
+ * ordinary C++ translation unit in the native-policy build (matching the
+ * add-budget/rebase-metadoc C++ companions).
  */
-#include "git-compat-util.h"
 #include "temperature.h"
 
 extern "C" int git_temperature_assess(struct git_temperature_project *p,

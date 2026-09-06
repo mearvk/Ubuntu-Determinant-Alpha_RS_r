@@ -1,5 +1,4 @@
 /* C++ companion for the native moral/blessing policy. */
-#include "git-compat-util.h"
 #include "moral.h"
 
 extern "C" int git_moral_bless(struct git_moral_blessing *blessing,

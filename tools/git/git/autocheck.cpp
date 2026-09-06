@@ -1,5 +1,4 @@
 /* C++ companion for the native autocheck policy. */
-#include "git-compat-util.h"
 #include "autocheck.h"
 
 extern "C" int git_autocheck_plan_make(struct git_autocheck_plan *plan,

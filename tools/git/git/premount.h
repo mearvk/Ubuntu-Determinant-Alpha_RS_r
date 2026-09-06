@@ -14,8 +14,19 @@
 #ifndef GIT_PREMOUNT_H
 #define GIT_PREMOUNT_H
 
+/*
+ * In C we use Git's compat layer. In C++ (the self-contained policy companion
+ * and any C++ consumer) git-compat-util.h is not C++-clean, so we pull only the
+ * fixed-width integer, size, and string helpers directly.
+ */
+#ifdef __cplusplus
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#else
 #include "git-compat-util.h"
 #include <stdint.h>
+#endif
 
 /*
  * Which pending operations premount should account for. The set is a bit

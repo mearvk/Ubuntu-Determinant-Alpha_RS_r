@@ -2,8 +2,12 @@
 #ifndef GIT_OPERATION_LOGIC_H
 #define GIT_OPERATION_LOGIC_H
 
+#ifdef __cplusplus
+#include <cstdint>
+#else
 #include "git-compat-util.h"
 #include <stdint.h>
+#endif
 
 enum git_operation_kind {
 	GIT_OPERATION_ADD,

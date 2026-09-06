@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#
+# git-temperature — external subcommand shim.
+#
+# Standard Git dispatches `git temperature [args]` to an executable named
+# `git-temperature` found on PATH. This shim makes the Ubuntu Determinant
+# `temperature` advisory AI scan available under *any* stock Git (the tested
+# baseline is Git 2.50.x) without needing the Edition build. It simply locates
+# the sibling `git-workflow.sh` and forwards to its `temperature` subcommand.
+#
+# On the Edition Git the same operation is additionally described in
+# command-list.txt and its native policy is compiled by tools/git/build; this
+# shim keeps the behavior identical across both editions.
+#
+# Usage:
+#   git temperature [--recandle] [--min-idle DAYS]
+#   git temperature <repo> [--recandle] [--min-idle DAYS]
+#
+# When run through `git`, the current repository is used unless a repo path is
+# given as the first non-flag argument.
+set -euo pipefail
+
+# Resolve this script's real directory, following symlinks, so the shim works
+# whether it is on PATH directly or via a symlink into a bin dir.
+self="${BASH_SOURCE[0]}"
+while [ -h "$self" ]; do
+  dir="$(cd -P "$(dirname "$self")" >/dev/null 2>&1 && pwd)"
+  self="$(readlink "$self")"
+  case "$self" in /*) ;; *) self="$dir/$self" ;; esac
+done
+SHIM_DIR="$(cd -P "$(dirname "$self")" >/dev/null 2>&1 && pwd)"
+
+WORKFLOW="$SHIM_DIR/git-workflow.sh"
+if [ ! -x "$WORKFLOW" ] && [ ! -f "$WORKFLOW" ]; then
+  echo "git-temperature: cannot find git-workflow.sh next to this shim ($SHIM_DIR)" >&2
+  exit 1
+fi
+
+# Determine the repository. If the first argument is an existing directory,
+# treat it as the repo; otherwise default to Git's current repo (or '.').
+REPO="."
+if [ "$#" -gt 0 ] && [ -d "$1" ]; then
+  REPO="$1"; shift
+elif command -v git >/dev/null 2>&1; then
+  # Prefer the enclosing repository's top level when invoked as `git temperature`.
+  top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  [ -n "$top" ] && REPO="$top"
+fi
+
+# git-workflow.sh's argument shape is: <command> <repo> [command-args...]
+exec bash "$WORKFLOW" temperature "$REPO" "$@"

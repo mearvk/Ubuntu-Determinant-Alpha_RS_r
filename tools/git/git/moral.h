@@ -2,8 +2,13 @@
 #ifndef GIT_MORAL_H
 #define GIT_MORAL_H
 
+#ifdef __cplusplus
+#include <cstdint>
+#include <cstddef>
+#else
 #include "git-compat-util.h"
 #include <stdint.h>
+#endif
 
 #define GIT_MORAL_MANA_PER_SPELL ((uintmax_t)1)
 #define GIT_MORAL_GREAT_MANA_PER_SPELL ((uintmax_t)10)

@@ -9,15 +9,23 @@
 #include "git-compat-util.h"
 #include "add-budget.h"
 
-uintmax_t git_add_block_for_bytes(uintmax_t bytes)
+/*
+ * These are the *1-based block ordinal* planning helpers. They intentionally
+ * have distinct names from the header's inline primitives
+ * (git_add_block_for_bytes / git_add_block_would_cross_boundary), which return
+ * a 0-based block index and a simple boundary test. Sharing the header names
+ * here would redefine those inline functions; the "_planned" suffix keeps both
+ * the inline primitives and these ordinal helpers available.
+ */
+uintmax_t git_add_block_planned_ordinal(uintmax_t bytes)
 {
 	if (!bytes)
 		return 1;
 	return ((bytes - 1) / GIT_ADD_BLOCK_BYTES) + 1;
 }
 
-int git_add_block_would_cross_boundary(uintmax_t current_bytes,
-					       uintmax_t file_bytes)
+int git_add_block_planned_would_cross(uintmax_t current_bytes,
+				      uintmax_t file_bytes)
 {
 	uintmax_t current_block;
 	uintmax_t next_bytes;
@@ -28,7 +36,7 @@ int git_add_block_would_cross_boundary(uintmax_t current_bytes,
 		return 1;
 
 	next_bytes = current_bytes + file_bytes;
-	current_block = git_add_block_for_bytes(current_bytes);
-	return git_add_block_for_bytes(next_bytes) != current_block &&
+	current_block = git_add_block_planned_ordinal(current_bytes);
+	return git_add_block_planned_ordinal(next_bytes) != current_block &&
 		current_bytes % GIT_ADD_BLOCK_BYTES != 0;
 }
