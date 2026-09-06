@@ -16,7 +16,7 @@ YEARS = range(1965, 2027)
 FAO = 'https://bulks-faostat.fao.org/production/Production_Crops_Livestock_E_All_Data_(Normalized).zip'
 OWID = 'https://ourworldindata.org/grapher/{slug}.csv?v=1&csvType=full&useColumnShortNames=false'
 WB = 'https://api.worldbank.org/v2/country/NLD/indicator/{indicator}?format=json&per_page=100'
-ENTITIES = {'Netherlands'}
+ENTITIES = {'Netherlands', 'Netherlands (Kingdom of the)'}
 
 def get(url):
     req = urllib.request.Request(url, headers={'User-Agent': 'Ubuntu.Determinant.Beta.Restricted Netherlands archive builder/1.0'})
