@@ -1,9 +1,18 @@
 #ifndef PUSH_BUDGET_H
 #define PUSH_BUDGET_H
 
+/*
+ * push-budget.h is included by transport.h (guarded to builtin TUs), so it
+ * must not include transport.h back. It pulls the smaller helpers it needs
+ * directly: object-id hex, string vectors, subprocess, and gettext.
+ */
 #include "strbuf.h"
 #include "oid-array.h"
 #include "refs.h"
+#include "hex.h"
+#include "strvec.h"
+#include "run-command.h"
+#include "gettext.h"
 #include "resume-budget.h"
 
 /* Hard native ceiling: 200 MiB per push effort. */
@@ -46,7 +55,8 @@ static int push_budget_collect_ref(const struct reference *ref, void *cb_data)
 	return 0;
 }
 
-static int push_budget_add_local_tips(const struct refspec *rs,
+static int push_budget_add_local_tips(struct repository *repo,
+				      const struct refspec *rs,
 				      struct oid_array *tips, int mirror)
 {
 	struct push_budget_refs data = {
@@ -56,14 +66,20 @@ static int push_budget_add_local_tips(const struct refspec *rs,
 	};
 	struct object_id head_oid;
 
-	refs_for_each_ref(get_main_ref_store(the_repository),
+	/*
+	 * Use the repository passed in by the caller rather than the bare
+	 * the_repository global: this header is pulled in by every builtin
+	 * translation unit through transport.h, and not all of them define
+	 * USE_THE_REPOSITORY_VARIABLE.
+	 */
+	refs_for_each_ref(get_main_ref_store(repo),
 			  push_budget_collect_ref, &data);
 
 	/* HEAD is not part of refs_for_each_ref(). Explicit HEAD refspecs still
 	 * need their commit included in the budget. */
 	for (int i = 0; i < rs->nr; i++) {
 		if (rs->items[i].src && !strcmp(rs->items[i].src, "HEAD") &&
-		    !repo_get_oid(the_repository, "HEAD", &head_oid)) {
+		    !repo_get_oid(repo, "HEAD", &head_oid)) {
 			oid_array_append(tips, &head_oid);
 			break;
 		}
@@ -129,7 +145,8 @@ static int push_budget_measure(const struct oid_array *tips,
 	return 0;
 }
 
-static int push_budget_check(struct transport *transport,
+static int push_budget_check(struct repository *repo,
+				     struct transport *transport,
 				     struct refspec *rs,
 				     int flags)
 {
@@ -143,7 +160,7 @@ static int push_budget_check(struct transport *transport,
 	 * transport's cached advertisement rather than needing a second lookup. */
 	remote_refs = transport_get_remote_refs(transport, NULL);
 
-	if (!push_budget_add_local_tips(rs, &tips,
+	if (!push_budget_add_local_tips(repo, rs, &tips,
 					flags & TRANSPORT_PUSH_MIRROR))
 		goto cleanup;
 
@@ -182,7 +199,7 @@ static inline int transport_push_with_budget(struct repository *repo,
 					     int flags,
 					     unsigned int *reject_reasons)
 {
-	if (push_budget_check(connection, rs, flags) < 0)
+	if (push_budget_check(repo, connection, rs, flags) < 0)
 		return -1;
 
 	return transport_push(repo, connection, rs, flags, reject_reasons);
@@ -195,7 +212,8 @@ static inline int transport_push_with_budget(struct repository *repo,
  * front-end distinguish "the remote already has our tips" (nothing to do) from
  * "work remains" without inventing progress the remote never confirmed.
  */
-static int push_budget_acked_tips(struct transport *transport,
+static int push_budget_acked_tips(struct repository *repo,
+				  struct transport *transport,
 				  struct refspec *rs, int flags)
 {
 	const struct ref *remote_refs = transport_get_remote_refs(transport, NULL);
@@ -203,7 +221,7 @@ static int push_budget_acked_tips(struct transport *transport,
 	struct oid_array remote_tips = OID_ARRAY_INIT;
 	int acked = 0;
 
-	push_budget_add_local_tips(rs, &tips, flags & TRANSPORT_PUSH_MIRROR);
+	push_budget_add_local_tips(repo, rs, &tips, flags & TRANSPORT_PUSH_MIRROR);
 	push_budget_add_remote_tips(remote_refs, &remote_tips);
 
 	for (size_t i = 0; i < tips.nr; i++) {
@@ -249,7 +267,7 @@ static inline int transport_push_resume(struct repository *repo,
 		return -1;
 
 	/* Record what the remote already acknowledges before we start. */
-	if (push_budget_acked_tips(connection, rs, flags) > 0 &&
+	if (push_budget_acked_tips(repo, connection, rs, flags) > 0 &&
 	    git_resume_is_complete(cp))
 		return 0;
 
@@ -266,7 +284,7 @@ static inline int transport_push_resume(struct repository *repo,
 			 * remote advertisement and mark the effort complete
 			 * only on genuine acknowledgement.
 			 */
-			if (push_budget_acked_tips(connection, rs, flags) > 0) {
+			if (push_budget_acked_tips(repo, connection, rs, flags) > 0) {
 				git_resume_record_outcome(cp, git_resume_units_remaining(cp), 0);
 				if (git_resume_is_complete(cp))
 					return 0;

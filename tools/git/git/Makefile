@@ -1313,6 +1313,7 @@ LIB_OBJS += repository.o
 LIB_OBJS += rerere.o
 LIB_OBJS += reset.o
 LIB_OBJS += resolve-undo.o
+LIB_OBJS += resume-budget.o
 LIB_OBJS += revision.o
 LIB_OBJS += run-command.o
 LIB_OBJS += send-pack.o
