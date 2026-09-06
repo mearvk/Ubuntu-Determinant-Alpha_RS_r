@@ -134,16 +134,16 @@ Archive build: 2026-09-05.
 | 122 | Namibia | Africa | ✅ Pulled | `national/namibia/`; Partial: NSA Namibia |
 | 123 | Nauru | Oceania | ✅ Pulled | `national/nauru/`; microstate — no FAOSTAT entity, WDI-only (crop cells `N/A`). Partial: Nauru Bureau of Statistics |
 | 124 | Nepal | Asia | ✅ Pulled | `national/nepal/`; Partial: NSO Nepal |
-| 125 | Netherlands | Europe | ⬜ Not started | |
-| 126 | New Zealand | Oceania | ⬜ Not started | |
-| 127 | Nicaragua | Americas | ⬜ Not started | |
-| 128 | Niger | Africa | ⬜ Not started | |
-| 129 | Nigeria | Africa | ⬜ Not started | |
-| 130 | North Macedonia | Europe | ⬜ Not started | |
-| 131 | Norway | Europe | ⬜ Not started | |
-| 132 | Oman | Asia | ⬜ Not started | |
-| 133 | Pakistan | Asia | ⬜ Not started | |
-| 134 | Palau | Oceania | ⬜ Not started | |
+| 125 | Netherlands | Europe | ✅ Pulled | `national/netherlands/`; Partial: CBS |
+| 126 | New Zealand | Oceania | ✅ Pulled | `national/new-zealand/`; Partial: Stats NZ |
+| 127 | Nicaragua | Americas | ✅ Pulled | `national/nicaragua/`; Partial: INIDE |
+| 128 | Niger | Africa | ✅ Pulled | `national/niger/`; Partial: INS Niger |
+| 129 | Nigeria | Africa | ✅ Pulled | `national/nigeria/`; Partial: NBS Nigeria |
+| 130 | North Macedonia | Europe | ✅ Pulled | `national/north-macedonia/`; Partial: MAKStat |
+| 131 | Norway | Europe | ✅ Pulled | `national/norway/`; Partial: SSB |
+| 132 | Oman | Asia | ✅ Pulled | `national/oman/`; desert economy — sparse agriculture. Partial: NCSI |
+| 133 | Pakistan | Asia | ✅ Pulled | `national/pakistan/`; Partial: PBS |
+| 134 | Palau | Oceania | ✅ Pulled | `national/palau/`; tiny Pacific state — sparse coverage expected. Partial: Bureau of Budget & Planning |
 | 135 | Palestine | Asia | ⬜ Not started | Partially recognized |
 | 136 | Panama | Americas | ⬜ Not started | |
 | 137 | Papua New Guinea | Oceania | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 124 — through Nepal alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Nepal). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo, Liechtenstein, Monaco, Nauru) expectedly sparse.
-- **Remaining (⬜):** 73
+- **Data pulled (✅):** 134 — through Palau alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Palau). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo, Liechtenstein, Monaco, Nauru) expectedly sparse.
+- **Remaining (⬜):** 63
 
 ## Sources
 
@@ -360,6 +360,16 @@ These international families are reproducible baselines used across countries by
 | Namibia | NSA Namibia | PARTIAL | see `national/namibia/DATA_SOURCES.md` |
 | Nauru | Nauru Bureau of Statistics | PARTIAL | microstate; no FAOSTAT entity, WDI-only |
 | Nepal | NSO Nepal | PARTIAL | see `national/nepal/DATA_SOURCES.md` |
+| Netherlands | CBS | PARTIAL | see `national/netherlands/DATA_SOURCES.md` |
+| New Zealand | Stats NZ | PARTIAL | see `national/new-zealand/DATA_SOURCES.md` |
+| Nicaragua | INIDE | PARTIAL | see `national/nicaragua/DATA_SOURCES.md` |
+| Niger | INS Niger | PARTIAL | see `national/niger/DATA_SOURCES.md` |
+| Nigeria | NBS Nigeria | PARTIAL | see `national/nigeria/DATA_SOURCES.md` |
+| North Macedonia | MAKStat | PARTIAL | see `national/north-macedonia/DATA_SOURCES.md` |
+| Norway | SSB | PARTIAL | see `national/norway/DATA_SOURCES.md` |
+| Oman | NCSI | PARTIAL | desert economy; sparse agriculture |
+| Pakistan | PBS | PARTIAL | see `national/pakistan/DATA_SOURCES.md` |
+| Palau | Bureau of Budget & Planning | PARTIAL | tiny Pacific state; sparse coverage expected |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
