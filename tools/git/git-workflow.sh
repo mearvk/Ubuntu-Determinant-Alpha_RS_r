@@ -21,6 +21,7 @@ set -euo pipefail
 #   ./tools/git/git-workflow.sh premount [repo] push [remote] [branch] [--sha512] [--attempts N]
 #   ./tools/git/git-workflow.sh commit-parts [repo] <message>
 #   ./tools/git/git-workflow.sh push-resume [repo] [remote] [branch] [--attempts N]
+#   ./tools/git/git-workflow.sh temperature [repo] [--recandle] [--min-idle DAYS]
 
 usage() {
   cat >&2 <<'EOF'
@@ -38,6 +39,7 @@ Usage:
   git-workflow.sh premount [repo] push [remote] [branch] [--sha512] [--attempts N]
   git-workflow.sh commit-parts [repo] <message>
   git-workflow.sh push-resume [repo] [remote] [branch] [--attempts N]
+  git-workflow.sh temperature [repo] [--recandle] [--min-idle DAYS]
 EOF
   exit 2
 }
@@ -498,6 +500,163 @@ case "$command" in
 
     cmd_push_resume "$REPO" "$REMOTE" "$BRANCH" "$MAX_ATTEMPTS"
     exit $?
+    ;;
+
+  temperature)
+    # Read-only advisory AI scan. Walks the repository's top-level project
+    # subtrees, derives each project's idle age and heuristic signals from Git
+    # history, prints the three learner strips (quality/intention, relative
+    # importance, total achievable value) with a thermal band and recandle
+    # marker, and closes with repository totals. Never stages/commits/pushes.
+    # Mirrors git/temperature.h. See tools/git/TEMPERATURE.md.
+    ONLY_RECANDLE=0
+    MIN_IDLE=0
+    shift 2 2>/dev/null || shift $#
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --recandle) ONLY_RECANDLE=1 ;;
+        --min-idle) shift; MIN_IDLE="${1:-}"; [[ "$MIN_IDLE" =~ ^[0-9]+$ ]] || { echo "ERROR: --min-idle requires a non-negative integer." >&2; exit 2; } ;;
+        *) echo "ERROR: unknown temperature option: $1" >&2; exit 2 ;;
+      esac
+      shift
+    done
+
+    ROOT="$(git -C "$REPO" rev-parse --show-toplevel)"
+    NOW="$(date -u +%s)"
+
+    # Strip scale + band boundaries (mirror git/temperature.h).
+    SCALE=100
+    HOT=14; WARM=60; COOL=180
+    RC_MIN_IMP=40; RC_MIN_VAL=40
+
+    band_for_days() {
+      local d="$1"
+      if   [ "$d" -le "$HOT"  ]; then echo hot
+      elif [ "$d" -le "$WARM" ]; then echo warm
+      elif [ "$d" -le "$COOL" ]; then echo cool
+      else echo cold; fi
+    }
+
+    # Enumerate top-level project subtrees (directories), skipping VCS/meta.
+    projects=()
+    while IFS= read -r d; do
+      base="${d##*/}"
+      case "$base" in .git|.|..) continue ;; esac
+      projects+=("$base")
+    done < <(find "$ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort)
+
+    if [ "${#projects[@]}" -eq 0 ]; then
+      echo "temperature: no project subtrees found under $ROOT"
+      exit 0
+    fi
+
+    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "=== git temperature (advisory scan) ==="
+    echo "Repository: $ROOT"
+    echo "Generated:  $ts"
+    [ "$ONLY_RECANDLE" = 1 ] && echo "Filter:     recandle candidates only"
+    [ "$MIN_IDLE" -gt 0 ] && echo "Filter:     idle >= ${MIN_IDLE} day(s)"
+    echo
+
+    fmt='%-24s | %-5s | %7s | %-9s | %-10s | %-11s | %-9s\n'
+    # shellcheck disable=SC2059
+    printf "$fmt" "project" "band" "idle(d)" "quality" "importance" "value" "recandle"
+    # shellcheck disable=SC2059
+    printf "$fmt" "------------------------" "-----" "-------" "---------" "----------" "-----------" "---------"
+
+    # First pass: gather raw file/commit counts to compute relative importance.
+    declare -A F_COUNT=() C_COUNT=() IDLE=()
+    max_weight=1
+    for p in "${projects[@]}"; do
+      fc="$(git -C "$REPO" ls-files -- "$p" 2>/dev/null | wc -l | tr -d ' ')"
+      [ -n "$fc" ] || fc=0
+      # Untracked projects: count files on disk instead.
+      if [ "$fc" -eq 0 ]; then
+        fc="$(find "$ROOT/$p" -type f 2>/dev/null | wc -l | tr -d ' ')"
+        [ -n "$fc" ] || fc=0
+      fi
+      cc="$(git -C "$REPO" rev-list --count HEAD -- "$p" 2>/dev/null || echo 0)"
+      [ -n "$cc" ] || cc=0
+      # Idle days from last commit touching the path; fall back to mtime.
+      last_epoch="$(git -C "$REPO" log -1 --format=%ct -- "$p" 2>/dev/null || true)"
+      if [ -z "$last_epoch" ]; then
+        last_epoch="$(find "$ROOT/$p" -type f -printf '%T@\n' 2>/dev/null | sort -nr | head -1 | cut -d. -f1)"
+      fi
+      [ -n "$last_epoch" ] || last_epoch="$NOW"
+      idle=$(( (NOW - last_epoch) / 86400 ))
+      [ "$idle" -lt 0 ] && idle=0
+      F_COUNT["$p"]=$fc; C_COUNT["$p"]=$cc; IDLE["$p"]=$idle
+      # Importance weight combines size and history depth.
+      w=$(( fc + cc ))
+      [ "$w" -gt "$max_weight" ] && max_weight=$w
+    done
+
+    total_value=0; total_quality=0; recandle_count=0; listed=0
+    for p in "${projects[@]}"; do
+      fc=${F_COUNT["$p"]}; cc=${C_COUNT["$p"]}; idle=${IDLE["$p"]}
+      band="$(band_for_days "$idle")"
+
+      # --- Strip 1: quality & intention (heuristic, observable signals) ---
+      # Scaffolding contributes "intention" but is capped below 100 so a
+      # project always retains some improvement headroom. Staleness then
+      # discounts realized quality: a project left cold has, by definition,
+      # unrealized potential, which is what makes it worth recandling.
+      q=0
+      { [ -e "$ROOT/$p/README.md" ] || [ -n "$(find "$ROOT/$p" -maxdepth 1 -iname 'README*' 2>/dev/null)" ]; } && q=$((q+18))
+      { [ -e "$ROOT/$p/Makefile" ] || [ -e "$ROOT/$p/makefile" ] || [ -e "$ROOT/$p/CMakeLists.txt" ]; } && q=$((q+14))
+      [ -n "$(find "$ROOT/$p" -maxdepth 2 -type d \( -iname 'test' -o -iname 'tests' -o -iname 't' \) 2>/dev/null)" ] && q=$((q+16))
+      [ -n "$(find "$ROOT/$p" -maxdepth 1 -iname '*.md' 2>/dev/null)" ] && q=$((q+8))
+      # Coherent size (some files but not empty) and some history.
+      [ "$fc" -ge 3 ] && q=$((q+8))
+      [ "$cc" -ge 2 ] && q=$((q+6))
+      # Cap scaffolding-based quality at 70: full quality is never inferred
+      # from structure alone, leaving deliberate headroom.
+      [ "$q" -gt 70 ] && q=70
+      # Staleness discount: cold/cool projects lose realized quality, raising
+      # their achievable value (headroom) and surfacing recandle candidates.
+      case "$band" in
+        cold) q=$(( q * 60 / 100 )) ;;   # -40%
+        cool) q=$(( q * 80 / 100 )) ;;   # -20%
+      esac
+      [ "$q" -lt 0 ] && q=0
+      [ "$q" -gt "$SCALE" ] && q=$SCALE
+
+      # --- Strip 2: relative importance (size+history vs repo max) ---
+      w=$(( fc + cc ))
+      imp=$(( w * SCALE / max_weight ))
+      [ "$imp" -gt "$SCALE" ] && imp=$SCALE
+
+      # --- Strip 3: achievable value = (100 - quality) * importance / 100 ---
+      if [ "$q" -ge "$SCALE" ]; then val=0; else val=$(( (SCALE - q) * imp / SCALE )); fi
+
+      # Recandle: cold/cool + important + improvable.
+      recandle="no"
+      if { [ "$band" = "cold" ] || [ "$band" = "cool" ]; } \
+         && [ "$imp" -ge "$RC_MIN_IMP" ] && [ "$val" -ge "$RC_MIN_VAL" ]; then
+        recandle="yes"; recandle_count=$((recandle_count+1))
+      fi
+
+      total_value=$((total_value + val))
+      total_quality=$((total_quality + q))
+
+      # Apply filters for the listing (totals still cover all projects).
+      [ "$idle" -ge "$MIN_IDLE" ] || continue
+      [ "$ONLY_RECANDLE" = 1 ] && [ "$recandle" != "yes" ] && continue
+
+      listed=$((listed+1))
+      # shellcheck disable=SC2059
+      printf "$fmt" "$p" "$band" "$idle" "$q" "$imp" "$val" "$recandle"
+    done
+
+    echo
+    echo "--- learner strips (repository totals) ---"
+    echo "Projects scanned:        ${#projects[@]}   (listed: ${listed})"
+    echo "Recandle candidates:     ${recandle_count}"
+    echo "Total current quality:   ${total_quality}"
+    echo "Total achievable value:  ${total_value}   (improvement unlockable over current quality)"
+    echo
+    echo "Note: temperature is advisory and read-only; it stages/commits/pushes nothing."
+    echo "      Scores use observable project signals only, never identity or credentials."
     ;;
 
   *)
