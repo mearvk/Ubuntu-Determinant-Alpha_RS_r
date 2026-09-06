@@ -35,7 +35,6 @@ a package is to the concept of "software standard next to man the sage."
 
 | Rank | Software | Years developed | Software house | Age of expertise | Relative value | Importance (0–83) | Improve | Description |
 |-----:|---------|-----------------|----------------|-----------------:|----------------|:-----------------:|---------|-------------|
-
 | 1 | **cairo** | 2003 | cairographics.org / freedesktop.org | 23 | Foundational | 80 | High — foundational; changes need strong evidence and review | 2D vector graphics library (used by GTK+) |
 | 2 | **glib2.0** | 1998 | GNOME Project | 28 | Foundational | 80 | High — foundational; changes need strong evidence and review | GLib core utility library (low-level C library for GNOME) |
 | 3 | **systemd** | 2010 | systemd project (Red Hat origin) | 16 | Foundational | 80 | High — foundational; changes need strong evidence and review | System and service manager for Linux |
