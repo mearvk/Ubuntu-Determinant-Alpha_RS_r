@@ -17,6 +17,12 @@ This OS maintains three parallel user-space hierarchies:
 
 All three exist at the root level. `/usr` retains its standard Linux meaning. `/user` and `/deck` are new.
 
+> **Kernel-level redundancy is a separate concern.** This document describes the
+> user-space *layout*. The N-way redundant file table with wear/pressure/health
+> (Tables 1/2/3), and the kernel-call handles through which its reads and writes
+> are serviced, live in the **TAC3** filesystem module — see
+> [`markdown/TAC3.md`](TAC3.md) and `fs/tac3/` in the kernel tree.
+
 ---
 
 ## /usr — Machine on Behalf of the User

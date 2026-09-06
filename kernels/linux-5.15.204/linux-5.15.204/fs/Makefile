@@ -146,5 +146,6 @@ obj-$(CONFIG_PCOPY)		+= pcopy/
 # PMOVE - Parallel Copy/Move (NVMe Multi-Queue & PCIe Lane Aware)
 obj-$(CONFIG_PMOVE)		+= pmove/
 
-# NTUPLE - N-way Redundant File Table (Wear/Pressure/Health, Tables 1/2/3)
-obj-$(CONFIG_NTUPLE)		+= ntuple/
+# TAC3 - N-way Redundant Filesystem; reads/writes routed through its own VFS
+# handles, with Wear/Pressure/Health (Tables 1/2/3). Rebrand of NTUPLE.
+obj-$(CONFIG_TAC3)		+= tac3/
