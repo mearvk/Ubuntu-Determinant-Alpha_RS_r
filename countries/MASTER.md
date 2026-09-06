@@ -124,16 +124,16 @@ Archive build: 2026-09-05.
 | 112 | Mauritius | Africa | ✅ Pulled | `national/mauritius/`; small island state — sparse coverage expected. Partial: Statistics Mauritius |
 | 113 | Mexico | Americas | ✅ Pulled | `national/mexico/`; Partial: INEGI |
 | 114 | Micronesia | Oceania | ✅ Pulled | `national/micronesia/`; tiny Pacific state, FAOSTAT entity "Micronesia (Federated States of)". Partial: FSM Statistics |
-| 115 | Moldova | Europe | ⬜ Not started | |
-| 116 | Monaco | Europe | ⬜ Not started | |
-| 117 | Mongolia | Asia | ⬜ Not started | |
-| 118 | Montenegro | Europe | ⬜ Not started | |
-| 119 | Morocco | Africa | ⬜ Not started | |
-| 120 | Mozambique | Africa | ⬜ Not started | |
-| 121 | Myanmar | Asia | ⬜ Not started | |
-| 122 | Namibia | Africa | ⬜ Not started | |
-| 123 | Nauru | Oceania | ⬜ Not started | |
-| 124 | Nepal | Asia | ⬜ Not started | |
+| 115 | Moldova | Europe | ✅ Pulled | `national/moldova/`; FAOSTAT entity "Republic of Moldova". Partial: BNS Moldova |
+| 116 | Monaco | Europe | ✅ Pulled | `national/monaco/`; microstate — no FAOSTAT entity, WDI-only (crop cells `N/A`). Partial: IMSEE |
+| 117 | Mongolia | Asia | ✅ Pulled | `national/mongolia/`; Partial: NSO Mongolia |
+| 118 | Montenegro | Europe | ✅ Pulled | `national/montenegro/`; small state — sparse coverage expected. Partial: MONSTAT |
+| 119 | Morocco | Africa | ✅ Pulled | `national/morocco/`; Partial: HCP |
+| 120 | Mozambique | Africa | ✅ Pulled | `national/mozambique/`; Partial: INE Mozambique |
+| 121 | Myanmar | Asia | ✅ Pulled | `national/myanmar/`; Partial: CSO Myanmar |
+| 122 | Namibia | Africa | ✅ Pulled | `national/namibia/`; Partial: NSA Namibia |
+| 123 | Nauru | Oceania | ✅ Pulled | `national/nauru/`; microstate — no FAOSTAT entity, WDI-only (crop cells `N/A`). Partial: Nauru Bureau of Statistics |
+| 124 | Nepal | Asia | ✅ Pulled | `national/nepal/`; Partial: NSO Nepal |
 | 125 | Netherlands | Europe | ⬜ Not started | |
 | 126 | New Zealand | Oceania | ⬜ Not started | |
 | 127 | Nicaragua | Americas | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 114 — through Micronesia alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Micronesia). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo, Liechtenstein) expectedly sparse.
-- **Remaining (⬜):** 83
+- **Data pulled (✅):** 124 — through Nepal alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Nepal). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo, Liechtenstein, Monaco, Nauru) expectedly sparse.
+- **Remaining (⬜):** 73
 
 ## Sources
 
@@ -350,6 +350,16 @@ These international families are reproducible baselines used across countries by
 | Mauritius | Statistics Mauritius | PARTIAL | small island state; sparse coverage expected |
 | Mexico | INEGI | PARTIAL | see `national/mexico/DATA_SOURCES.md` |
 | Micronesia | FSM Statistics | PARTIAL | tiny Pacific state; FAOSTAT entity "Micronesia (Federated States of)" |
+| Moldova | BNS Moldova | PARTIAL | FAOSTAT entity "Republic of Moldova" |
+| Monaco | IMSEE | PARTIAL | microstate; no FAOSTAT entity, WDI-only |
+| Mongolia | NSO Mongolia | PARTIAL | see `national/mongolia/DATA_SOURCES.md` |
+| Montenegro | MONSTAT | PARTIAL | small state; sparse coverage expected |
+| Morocco | HCP | PARTIAL | see `national/morocco/DATA_SOURCES.md` |
+| Mozambique | INE Mozambique | PARTIAL | see `national/mozambique/DATA_SOURCES.md` |
+| Myanmar | CSO Myanmar | PARTIAL | see `national/myanmar/DATA_SOURCES.md` |
+| Namibia | NSA Namibia | PARTIAL | see `national/namibia/DATA_SOURCES.md` |
+| Nauru | Nauru Bureau of Statistics | PARTIAL | microstate; no FAOSTAT entity, WDI-only |
+| Nepal | NSO Nepal | PARTIAL | see `national/nepal/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
