@@ -39,7 +39,6 @@ a package is to the concept of "software standard next to man the sage."
 
 | Rank | Software | Years developed | Software house | Age of expertise | Relative value | Importance (0–83) | Improve | Description |
 |-----:|---------|-----------------|----------------|-----------------:|----------------|:-----------------:|---------|-------------|
-
 | 1 | **glibc** | 1988 | GNU / Free Software Foundation | 38 | Foundational | 83 | High — foundational; changes need strong evidence and review | GNU C Library — system's core C library |
 | 2 | **coreutils** | 2002 | GNU Project | 24 | Foundational | 82 | High — foundational; changes need strong evidence and review | GNU core utilities (ls, cp, mv, cat, chmod, etc.) |
 | 3 | **bash** | 1989 | GNU / Free Software Foundation | 37 | Foundational | 81 | High — foundational; changes need strong evidence and review | GNU Bourne Again SHell — default Linux command interpreter |
