@@ -55,6 +55,13 @@ typedef struct {
     int count;
 } pkg_manifest;
 
+/* Which install-tree layout to target. */
+typedef enum {
+    PKG_EDITION_AUTO = 0,  /* detect at runtime (default)                 */
+    PKG_EDITION_WHITE,     /* Ubuntu White Edition: /deck /user /system   */
+    PKG_EDITION_STANDARD,  /* standard Ubuntu (FHS): /usr /sbin           */
+} pkg_edition;
+
 /* Resolved run state. */
 typedef struct {
     char repo[PATH_MAX];
@@ -62,7 +69,16 @@ typedef struct {
     char function[PKG_MAX_FIELD];  /* --function value (may be empty)     */
     int  do_install;               /* --install: actually copy            */
     int  list_only;                /* --list: print manifest and exit     */
+    pkg_edition edition;           /* --edition / PKG_EDITION / auto      */
 } run_state;
+
+/* Resolved destination set for the active edition. */
+typedef struct {
+    const char *name;                   /* "white" | "standard"           */
+    const char *roots[PKG_MAX_ROOTS];   /* base dirs (e.g. "/deck")       */
+    const char *subdirs[PKG_MAX_ROOTS]; /* subdir under each root ("bin") */
+    int count;
+} pkg_destset;
 
 /* ------------------------------------------------------------------ */
 /* Small helpers.                                                     */
@@ -90,6 +106,83 @@ static int contains_ci(const char *hay, const char *needle) {
         if (!*b) return 1;
     }
     return 0;
+}
+
+/*
+ * Detect whether /etc/os-release identifies this as an Ubuntu White Edition
+ * system. Case-insensitive scan for a "white" edition marker in the branding
+ * fields (VARIANT=, PRETTY_NAME=, ID=, VARIANT_ID=). Read-only.
+ */
+static int os_release_is_white(void) {
+    FILE *fp = fopen(PKG_OS_RELEASE, "r");
+    if (!fp)
+        return 0;
+    char line[512];
+    int white = 0;
+    while (fgets(line, sizeof line, fp)) {
+        /* Only consider the branding-relevant keys. */
+        if (strncmp(line, "VARIANT", 7) != 0 &&
+            strncmp(line, "PRETTY_NAME", 11) != 0 &&
+            strncmp(line, "ID", 2) != 0)
+            continue;
+        if (contains_ci(line, "white edition") || contains_ci(line, "white-edition") ||
+            contains_ci(line, "ubuntu-white") || contains_ci(line, "ubuntu white")) {
+            white = 1;
+            break;
+        }
+    }
+    fclose(fp);
+    return white;
+}
+
+/*
+ * Resolve the effective edition, in strict precedence order so a stock system
+ * is never mistaken for White Edition:
+ *   1. explicit request (--edition white|standard, i.e. st->edition != AUTO);
+ *   2. PKG_EDITION environment variable (white|standard);
+ *   3. explicit marker file PKG_WE_MARKER present  -> white;
+ *   4. /etc/os-release brands the system as White  -> white;
+ *   5. both White Edition trees already exist (/deck and /user) -> white;
+ *   6. otherwise -> standard (FHS: /usr, /sbin).
+ */
+static pkg_edition resolve_edition(const run_state *st) {
+    if (st->edition == PKG_EDITION_WHITE || st->edition == PKG_EDITION_STANDARD)
+        return st->edition;
+
+    const char *env = getenv("PKG_EDITION");
+    if (env) {
+        if (contains_ci(env, "white"))    return PKG_EDITION_WHITE;
+        if (contains_ci(env, "standard") ||
+            contains_ci(env, "ubuntu") ||
+            contains_ci(env, "fhs"))      return PKG_EDITION_STANDARD;
+    }
+
+    if (path_exists(PKG_WE_MARKER))
+        return PKG_EDITION_WHITE;
+    if (os_release_is_white())
+        return PKG_EDITION_WHITE;
+    if (is_dir(PKG_WE_DECK_ROOT) && is_dir(PKG_WE_USER_ROOT))
+        return PKG_EDITION_WHITE;
+
+    return PKG_EDITION_STANDARD;
+}
+
+/* Fill the destination set for the resolved edition. */
+static void edition_destset(pkg_edition ed, pkg_destset *d) {
+    memset(d, 0, sizeof *d);
+    if (ed == PKG_EDITION_WHITE) {
+        d->name = "white";
+        d->roots[0] = PKG_WE_DECK_ROOT;   d->subdirs[0] = PKG_BIN_SUBDIR;
+        d->roots[1] = PKG_WE_USER_ROOT;   d->subdirs[1] = PKG_BIN_SUBDIR;
+        d->roots[2] = PKG_WE_SYSTEM_ROOT; d->subdirs[2] = PKG_BIN_SUBDIR;
+        d->count = 3;
+    } else {
+        d->name = "standard";
+        /* FHS: /usr/bin for ordinary tools, /sbin directly for system bins. */
+        d->roots[0] = PKG_STD_USR_ROOT;   d->subdirs[0] = PKG_BIN_SUBDIR;
+        d->roots[1] = PKG_STD_SBIN_ROOT;  d->subdirs[1] = "";  /* /sbin itself */
+        d->count = 2;
+    }
 }
 
 /*
@@ -207,7 +300,7 @@ static int select_components(const run_state *st, const pkg_manifest *m, int *se
 /* Returns 0 on success, negative on failure.                         */
 /* ------------------------------------------------------------------ */
 static int install_one(const char *repo, const pkg_component *c,
-                       const char *destroot, int do_install) {
+                       const char *destroot, const char *subdir, int do_install) {
     char src[PATH_MAX];
     char destdir[PATH_MAX];
     char dest[PATH_MAX];
@@ -217,7 +310,13 @@ static int install_one(const char *repo, const pkg_component *c,
     char srcfile[PATH_MAX];
     if (join_path(srcfile, sizeof srcfile, src, c->name) != 0) return -1;
 
-    if (join_path(destdir, sizeof destdir, destroot, PKG_BIN_SUBDIR) != 0) return -1;
+    /* An empty subdir means install directly into destroot (e.g. /sbin). */
+    if (subdir && subdir[0]) {
+        if (join_path(destdir, sizeof destdir, destroot, subdir) != 0) return -1;
+    } else {
+        if (snprintf(destdir, sizeof destdir, "%s", destroot) >= (int)sizeof destdir)
+            return -1;
+    }
     if (join_path(dest, sizeof dest, destdir, c->name) != 0) return -1;
 
     printf("    %-12s %s -> %s\n", c->id, srcfile, dest);
@@ -261,24 +360,35 @@ static int install_one(const char *repo, const pkg_component *c,
 static void usage(void) {
     printf("%s %s — %s\n\n", PKG_PROGRAM, PKG_VERSION, PKG_EDITION);
     printf("Usage: %s (--disc <name> | --function <keyword>) [--install] [OPTIONS]\n\n", PKG_PROGRAM);
-    puts("Installs the repository's package software DIRECTLY into the /user and");
-    puts("/deck trees. Choose what to install by disc (a named bundle) or by");
+    puts("Installs the repository's package software DIRECTLY into edition-aware");
+    puts("destination trees. Choose what to install by disc (a named bundle) or by");
     puts("function (a role/keyword matched against the manifest).");
     puts("");
+    puts("Destinations are chosen by detected edition:");
+    printf("  White Edition : %s/%s, %s/%s, %s/%s\n",
+           PKG_WE_DECK_ROOT, PKG_BIN_SUBDIR, PKG_WE_USER_ROOT, PKG_BIN_SUBDIR,
+           PKG_WE_SYSTEM_ROOT, PKG_BIN_SUBDIR);
+    printf("  Standard      : %s/%s, %s\n",
+           PKG_STD_USR_ROOT, PKG_BIN_SUBDIR, PKG_STD_SBIN_ROOT);
+    puts("");
     puts("With no --install flag it performs a DRY RUN: it resolves and prints the");
-    puts("install plan for both /user and /deck but writes nothing.");
+    puts("install plan for every destination but writes nothing.");
     puts("");
     puts("Selection (choose one):");
     puts("  --disc <name>        Install the named disc/bundle. Use 'all' for every component.");
     puts("  --function <keyword> Install every component whose id/name matches the keyword.");
     puts("");
     puts("Options:");
+    puts("  --edition <e>        Force destination edition: white | standard | auto");
+    puts("                       (default auto; also honors the PKG_EDITION env var).");
     puts("  --install            Actually copy artifacts (default is a dry run).");
     puts("  --list               List the package manifest and exit.");
     puts("  --help, -h           Show this help and exit.");
     puts("");
-    printf("Install destinations: %s/%s and %s/%s\n",
-           PKG_USER_ROOT, PKG_BIN_SUBDIR, PKG_DECK_ROOT, PKG_BIN_SUBDIR);
+    puts("Edition auto-detection precedence: --edition, then PKG_EDITION, then the");
+    printf("  %s marker file, then /etc/os-release branding, then the presence of\n", PKG_WE_MARKER);
+    printf("  both %s and %s; otherwise standard (FHS).\n",
+           PKG_WE_DECK_ROOT, PKG_WE_USER_ROOT);
 }
 
 /* ------------------------------------------------------------------ */
@@ -317,6 +427,15 @@ static int parse_args(int argc, char **argv, run_state *st) {
             st->do_install = 0;
         } else if (strcmp(arg, "--list") == 0) {
             st->list_only = 1;
+        } else if (strcmp(arg, "--edition") == 0) {
+            const char *v = inlineval ? inlineval : (++i < argc ? argv[i] : NULL);
+            if (!v) { fprintf(stderr, "ERROR: --edition requires white|standard|auto.\n"); return -1; }
+            if (contains_ci(v, "white"))         st->edition = PKG_EDITION_WHITE;
+            else if (contains_ci(v, "standard") ||
+                     contains_ci(v, "ubuntu") ||
+                     contains_ci(v, "fhs"))      st->edition = PKG_EDITION_STANDARD;
+            else if (contains_ci(v, "auto"))     st->edition = PKG_EDITION_AUTO;
+            else { fprintf(stderr, "ERROR: unknown --edition '%s' (use white|standard|auto).\n", v); return -1; }
         } else {
             fprintf(stderr, "ERROR: Unknown option: %s\n", argv[i]);
             fprintf(stderr, "Try '%s --help' for usage.\n", PKG_PROGRAM);
@@ -392,20 +511,31 @@ int main(int argc, char **argv) {
         return 5;
     }
 
+    /* Resolve the edition-aware destination set. */
+    pkg_edition ed = resolve_edition(&st);
+    pkg_destset dest;
+    edition_destset(ed, &dest);
+    printf("[ok] Edition: %s%s\n", dest.name,
+           st.edition == PKG_EDITION_AUTO ? " (auto-detected)" : " (forced)");
+
     puts("");
     printf("== Plan: install %d component(s) by %s '%s' ==\n",
            nsel, st.disc[0] ? "disc" : "function",
            st.disc[0] ? st.disc : st.function);
     printf("%s\n", st.do_install ? "[install] copying artifacts:" : "[dry-run] would install (no changes):");
 
-    const char *roots[2] = { PKG_USER_ROOT, PKG_DECK_ROOT };
     int failures = 0, actions = 0;
-    for (int r = 0; r < 2; r++) {
-        printf("  destination %s/%s:\n", roots[r], PKG_BIN_SUBDIR);
+    for (int r = 0; r < dest.count; r++) {
+        const char *root = dest.roots[r];
+        const char *sub  = dest.subdirs[r];
+        if (sub && sub[0])
+            printf("  destination %s/%s:\n", root, sub);
+        else
+            printf("  destination %s:\n", root);
         for (int i = 0; i < m.count; i++) {
             if (!sel[i]) continue;
             actions++;
-            if (install_one(st.repo, &m.items[i], roots[r], st.do_install) != 0 && st.do_install)
+            if (install_one(st.repo, &m.items[i], root, sub, st.do_install) != 0 && st.do_install)
                 failures++;
         }
     }
@@ -421,8 +551,16 @@ int main(int argc, char **argv) {
     printf("selection mode         : %s\n", st.disc[0] ? "disc" : "function");
     printf("selection value        : %s\n", st.disc[0] ? st.disc : st.function);
     printf("components selected    : %d\n", nsel);
-    printf("destinations           : %s/%s, %s/%s\n",
-           PKG_USER_ROOT, PKG_BIN_SUBDIR, PKG_DECK_ROOT, PKG_BIN_SUBDIR);
+    printf("edition                : %s%s\n", dest.name,
+           st.edition == PKG_EDITION_AUTO ? " (auto-detected)" : " (forced)");
+    printf("destinations           : ");
+    for (int r = 0; r < dest.count; r++) {
+        if (dest.subdirs[r] && dest.subdirs[r][0])
+            printf("%s%s/%s", r ? ", " : "", dest.roots[r], dest.subdirs[r]);
+        else
+            printf("%s%s", r ? ", " : "", dest.roots[r]);
+    }
+    printf("\n");
     printf("operation              : %s\n",
            st.do_install ? "direct install" : "dry-run (plan only)");
     printf("planned actions        : %d\n", actions);

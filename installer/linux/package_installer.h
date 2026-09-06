@@ -7,7 +7,9 @@
  * declared role/function matches a requested keyword). Unlike white-installer,
  * which is a control plane that delegates to the Bash engine, package-installer
  * installs DIRECTLY: it copies the resolved install artifacts into the target
- * location families under /user and /deck.
+ * location families. The destination trees are EDITION AWARE: on Ubuntu White
+ * Edition it uses /deck, /user, and /system; on a standard Ubuntu it falls back
+ * to the FHS locations /usr and /sbin.
  *
  * The component/source/name/default data is single-sourced from
  * installer/install-manifest.txt so this binary and the rest of the installer
@@ -27,12 +29,39 @@
 #define PKG_INSTALL_MANIFEST "installer/install-manifest.txt"
 
 /*
- * Direct-install destination roots. Per the White Edition install contract the
- * package software is installed into BOTH the /user and /deck trees.
+ * Direct-install destination roots — EDITION AWARE.
+ *
+ * Ubuntu White Edition uses its own install trees; on White Edition the package
+ * software is installed into the /deck, /user, and /system trees. On a standard
+ * (non-White) Ubuntu the FHS locations /usr and /sbin are used instead. The
+ * edition is detected at runtime (see detect_edition()); it can be forced with
+ * --edition white|standard or the PKG_EDITION environment variable.
+ *
+ * A destination is <root>/<subdir>: <root>/bin for ordinary tools, and on the
+ * standard edition /sbin is used directly as a system-binary root.
  */
-#define PKG_USER_ROOT "/user"
-#define PKG_DECK_ROOT "/deck"
+
+/* White Edition destination roots. */
+#define PKG_WE_DECK_ROOT   "/deck"
+#define PKG_WE_USER_ROOT   "/user"
+#define PKG_WE_SYSTEM_ROOT "/system"
+
+/* Standard (FHS) destination roots. */
+#define PKG_STD_USR_ROOT   "/usr"    /* -> /usr/bin  */
+#define PKG_STD_SBIN_ROOT  "/sbin"   /* used directly as a bin dir */
+
 #define PKG_BIN_SUBDIR "bin"
+
+/*
+ * Optional explicit White Edition marker file. When present it forces White
+ * Edition regardless of /etc/os-release. This lets a freshly-built rootfs
+ * declare its edition before os-release branding is finalized.
+ */
+#define PKG_WE_MARKER "/etc/ubuntu-white-edition"
+#define PKG_OS_RELEASE "/etc/os-release"
+
+/* Max destination roots for any single edition. */
+#define PKG_MAX_ROOTS 3
 
 /* Upper bounds kept generous but fixed so the binary needs no heap growth. */
 #define PKG_MAX_COMPONENTS 256
