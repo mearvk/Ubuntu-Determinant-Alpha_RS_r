@@ -43,7 +43,6 @@ dissolve toward the low end.
 
 | Rank | Software | Years developed | Software house | Age of expertise | Relative value | Importance (0–83) | Improve | Description |
 |-----:|---------|-----------------|----------------|-----------------:|----------------|:-----------------:|---------|-------------|
-
 | 1 | **perl** | 1987 | Larry Wall / Perl community | 39 | High | 72 | High — foundational; changes need strong evidence and review | Perl language interpreter and core runtime |
 | 2 | **python3.11** | 1991 | Python Software Foundation | 35 | High | 72 | High — foundational; changes need strong evidence and review | Python 3.11 language interpreter and runtime |
 | 3 | **pam** | 1996 | Linux-PAM project | 30 | High | 70 | High — foundational; changes need strong evidence and review | Pluggable Authentication Modules — system auth framework |
