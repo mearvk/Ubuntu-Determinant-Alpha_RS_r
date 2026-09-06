@@ -1,5 +1,80 @@
 # Installer Primer
 
+## Package Installer (direct package-software install)
+
+`package-installer` installs the repository's package software **directly** into
+the `/user` and `/deck` trees. It is a single native C11 ELF built from
+`installer/linux/package_installer.c` (+ `.h`). Unlike `white-installer` it is
+not a control plane and does not delegate to the Bash engine — it resolves what
+to install from `installer/install-manifest.txt` and copies the artifacts
+itself. It still follows the White Edition safety contract: the default run is a
+DRY RUN that plans and reports but writes nothing.
+
+### Selection
+
+Choose exactly one selection mode:
+
+```text
+--disc <name>        Install a named disc/bundle. The component whose id equals
+                     <name> is selected. Use --disc all to select every
+                     component in the manifest.
+--function <keyword> Install every component whose id or install-name contains
+                     <keyword> (case-insensitive), i.e. install "by function".
+```
+
+### CLI flags
+
+```text
+--disc <name>        Select a disc/bundle (or 'all').
+--function <keyword> Select by function/role keyword.
+--install, --confirm Actually copy artifacts (default is a dry run).
+--dry-run            Plan only, never copy (this is the default).
+--list               Print the package manifest and exit.
+--help, -h           Show usage and exit.
+```
+
+### Destinations
+
+The resolved artifacts are installed into BOTH trees:
+
+```text
+/user/bin/<install-name>
+/deck/bin/<install-name>
+```
+
+Each installed file is written mode `0755`. The parent directories are created
+if missing. Installing into `/user` and `/deck` may require appropriate
+privileges depending on host permissions.
+
+### Flow
+
+```text
+locate clone -> load install-manifest.txt -> resolve selection
+   -> plan (per /user and /deck) -> [--install] copy artifacts -> AUDIT report
+```
+
+The default (no `--install`) prints the full plan for both destinations and an
+audit report, and exits without touching the filesystem.
+
+### Build
+
+```sh
+make -C installer/linux package-installer
+```
+
+or build every native installer binary at once:
+
+```sh
+make -C installer/linux all
+```
+
+### Install / uninstall the binary itself
+
+```sh
+make -C installer/linux package-installer-install     # copies into /user/bin and /deck/bin
+make -C installer/linux package-installer-uninstall
+```
+
 ## White Installer (full smooth install experience)
 
 `white-installer` is the default "usual" smooth front door for installing the

@@ -106,6 +106,7 @@ The existing ISO and Ubuntu installer paths remain the established image/provisi
 - `white-installer`: the smooth-install orchestrator ELF and default front door. It runs a seven-stage guided flow (PROBE, PREVIEW read-only, COMPONENTS, TARGET, CONFIRM, DELEGATE, AUDIT) with checkbox and command-line component selection. It is a control plane that delegates to `scripts/galactic-cherry-installer` rather than reimplementing disk or package logic, runs unprivileged, and defaults to a safe dry-run. This is the headline new binary.
 - `desktop_install_probe`: the existing Step-1 discovery and bootstrap probe. It locates the clone and the install set, previews and performs dry-run discovery, and can carry out an explicit install. It already exists and is listed here for context.
 - `nxtt`: the NXTT uninstaller helper ELF.
+- `package-installer`: installs the repository's package software **directly** into the `/user` and `/deck` trees. Selection is by **disc** (`--disc <name>`, a named bundle from `install-manifest.txt`; `--disc all` takes everything) or by **function** (`--function <keyword>`, matching component id/install-name). Unlike `white-installer` it does not delegate to the Bash engine — it copies the resolved artifacts itself. It still follows the White Edition safety contract: the default run is a dry-run that plans and reports but writes nothing; use `--install` to actually copy. See `INSTALL.md`.
 
 These build from `installer/linux/Makefile`:
 

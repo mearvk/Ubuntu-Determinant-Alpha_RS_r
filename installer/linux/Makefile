@@ -1,4 +1,4 @@
-.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link nxtt nxtt-install nxtt-uninstall nxtt-clean nxtt-test white-installer white-installer-static
+.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link nxtt nxtt-install nxtt-uninstall nxtt-clean nxtt-test white-installer white-installer-static package-installer-install package-installer-uninstall
 
 CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic
@@ -13,6 +13,14 @@ NXTT_SRC := nxtt-uninstaller.c
 WIO_TARGET := white-installer
 WIO_SRC := white_installer_orchestrator.c
 WIO_HDR := white_installer_orchestrator.h
+
+# package-installer: installs the repository's package software directly into
+# the /user and /deck trees, selected by disc (a named bundle) or by function
+# (a role/keyword). Unlike white-installer it does not delegate; it copies the
+# resolved artifacts itself. Default run is a safe dry-run.
+PKG_TARGET := package-installer
+PKG_SRC := package_installer.c
+PKG_HDR := package_installer.h desktop_install_probe.h
 
 USER_ROOT ?= /user
 USR_ROOT ?= /usr
@@ -29,7 +37,7 @@ USR_RUNNABLES := $(USR_ROOT)/runnables
 DECK_BIN := $(DECK_ROOT)/bin
 DECK_RUNNABLES := $(DECK_ROOT)/runnables
 
-all: $(TARGET) $(NXTT_TARGET) $(WIO_TARGET)
+all: $(TARGET) $(NXTT_TARGET) $(WIO_TARGET) $(PKG_TARGET)
 
 $(TARGET): $(SRC) desktop_install_probe.h
 	$(CC) $(CFLAGS) -o $@ $(SRC)
@@ -50,6 +58,20 @@ $(WIO_TARGET): $(WIO_SRC) $(WIO_HDR) desktop_install_probe.h
 # `white-installer` target for in-sandbox compile validation.
 white-installer-static: $(WIO_SRC) $(WIO_HDR) desktop_install_probe.h
 	$(CC) $(CFLAGS) -static -o $(WIO_TARGET) $(WIO_SRC)
+
+# Build package-installer (normal dynamic link, matches white-installer).
+$(PKG_TARGET): $(PKG_SRC) $(PKG_HDR)
+	$(CC) $(CFLAGS) -static-libgcc -o $@ $(PKG_SRC)
+
+# Install package-installer into BOTH the /user and /deck bin trees.
+package-installer-install: $(PKG_TARGET)
+	install -d $(USER_BIN) $(DECK_BIN)
+	install -m 0755 $(PKG_TARGET) $(USER_BIN)/$(PKG_TARGET)
+	install -m 0755 $(PKG_TARGET) $(DECK_BIN)/$(PKG_TARGET)
+	@echo "Installed $(PKG_TARGET) to $(USER_BIN) and $(DECK_BIN)"
+
+package-installer-uninstall:
+	rm -f $(USER_BIN)/$(PKG_TARGET) $(DECK_BIN)/$(PKG_TARGET)
 
 install: $(TARGET)
 	@case "$(INSTALL_CHOICE)" in \
@@ -137,7 +159,7 @@ update-front-link:
 	fi
 
 clean:
-	rm -f $(TARGET) $(NXTT_TARGET) $(WIO_TARGET)
+	rm -f $(TARGET) $(NXTT_TARGET) $(WIO_TARGET) $(PKG_TARGET)
 
 uninstall:
 	rm -f $(USER_BIN)/$(TARGET) $(USER_RUNNABLES)/$(TARGET) \
@@ -146,4 +168,5 @@ uninstall:
 	      $(USER_BIN)/$(WIO_TARGET) $(USER_RUNNABLES)/$(WIO_TARGET) \
 	      $(USR_BIN)/$(WIO_TARGET) $(USR_RUNNABLES)/$(WIO_TARGET) \
 	      $(DECK_BIN)/$(WIO_TARGET) $(DECK_RUNNABLES)/$(WIO_TARGET) \
+	      $(USER_BIN)/$(PKG_TARGET) $(DECK_BIN)/$(PKG_TARGET) \
 	      $(FRONT_LINK)
