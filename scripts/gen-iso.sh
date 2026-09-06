@@ -102,7 +102,24 @@ menuentry "Galactic Cherry Marvell Edition 98 - Live System" {
     initrd /boot/initrd.img
 }
 
-menuentry "Galactic Cherry Marvell Edition 98 - Install to Disk" {
+# ── Edition install entries ──────────────────────────────────────────────
+# Both editions boot the SAME shared kernel/initrd/squashfs. The only
+# difference is the edition= marker on the kernel command line, which the
+# live installer (galactic-cherry-installer) reads from /proc/cmdline to
+# preset the desktop and optional components:
+#   edition=white -> Ubuntu White (GNOME + Ubuntu White theme/icon overlay)
+#   edition=mate  -> MATE (Galactic Cherry Red theme)
+menuentry "Install Ubuntu White Edition" {
+    linux /boot/vmlinuz boot=live toram installer edition=white quiet splash
+    initrd /boot/initrd.img
+}
+
+menuentry "Install MATE Edition (Galactic Cherry Red)" {
+    linux /boot/vmlinuz boot=live toram installer edition=mate quiet splash
+    initrd /boot/initrd.img
+}
+
+menuentry "Install to Disk (choose edition in installer)" {
     linux /boot/vmlinuz boot=live toram installer
     initrd /boot/initrd.img
 }

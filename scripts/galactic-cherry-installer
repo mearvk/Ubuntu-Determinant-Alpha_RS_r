@@ -792,6 +792,54 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# ------------------------------------------------------------
+# Boot-menu edition selection (edition=white | edition=mate).
+#
+# The live ISO GRUB menu offers "Install Ubuntu White Edition" and
+# "Install MATE Edition" entries that boot the same kernel/initrd/squashfs
+# but pass an edition= marker on the kernel command line. Read it from
+# /proc/cmdline and preset the desktop + optional components so the boot
+# choice flows straight into the wizard.
+#
+# Explicit CLI flags (--desktop/--enable/--disable) and INSTALL_DESKTOP/
+# INSTALL_COMPONENTS env vars are set BEFORE this runs and always win: this
+# block only fills in a desktop that was not already chosen.
+# ------------------------------------------------------------
+apply_boot_edition() {
+    local edition=""
+    if [ -r /proc/cmdline ]; then
+        for tok in $(cat /proc/cmdline); do
+            case "$tok" in
+                edition=*) edition="${tok#edition=}" ;;
+            esac
+        done
+    fi
+    # Allow an explicit override for testing without a real boot cmdline.
+    [ -n "${INSTALL_EDITION:-}" ] && edition="$INSTALL_EDITION"
+    [ -z "$edition" ] && return 0
+
+    case "$edition" in
+        white)
+            # Ubuntu White = GNOME desktop + the ubuntu-white theme/icon overlay.
+            [ -z "$INSTALL_DESKTOP" ] && INSTALL_DESKTOP="gnome"
+            [ -z "$INSTALL_COMPONENTS" ] && INSTALL_COMPONENTS="$DEFAULT_COMPONENTS"
+            components_enable "ubuntu-white"
+            COMPONENTS_PRESET=1
+            log "Boot edition: white -> desktop=$INSTALL_DESKTOP components='$INSTALL_COMPONENTS'"
+            ;;
+        mate)
+            [ -z "$INSTALL_DESKTOP" ] && INSTALL_DESKTOP="mate"
+            [ -z "$INSTALL_COMPONENTS" ] && INSTALL_COMPONENTS="$DEFAULT_COMPONENTS"
+            COMPONENTS_PRESET=1
+            log "Boot edition: mate -> desktop=$INSTALL_DESKTOP components='$INSTALL_COMPONENTS'"
+            ;;
+        *)
+            log "Boot edition: unrecognized '$edition' (ignored; installer will prompt)"
+            ;;
+    esac
+}
+apply_boot_edition
+
 # If INSTALL_COMPONENTS was supplied via the environment, treat it as a preset.
 [ -n "$INSTALL_COMPONENTS" ] && COMPONENTS_PRESET=1
 
