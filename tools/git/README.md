@@ -198,6 +198,45 @@ directly (git-compat-util.h is not C++-clean standalone), so the C++ companions
 build as ordinary translation units. Command registration and any deeper builtin
 integration remain separate, deliberate steps.
 
+## Building the full Edition git binary
+
+The whole vendored `git` binary (with the native operations wired in) builds
+from `git/` via Git's own Makefile. The known-good flag set and the sandbox
+prerequisites are captured so the build does not have to be rediscovered:
+
+```sh
+tools/git/build-edition-git.sh            # provision shims, build, verify
+tools/git/build-edition-git.sh -j 8       # choose parallelism
+tools/git/build-edition-git.sh --clean    # force a full rebuild first
+tools/git/build-edition-git.sh --verify-only   # just re-run the checks
+```
+
+The wrapper:
+
+1. provisions tiny `cmp`/`diff` shims when GNU diffutils is absent (Git's build
+   scripts call `cmp`, and the restricted/CI sandbox may lack it with no network
+   to install it);
+2. applies the captured flag set from `build/git-full.mk`
+   (`NO_EXPAT`, `NO_LIBPCRE`, `NO_GETTEXT`, `NO_TCLTK`, `NO_PYTHON` — all stock
+   upstream Git knobs; the missing libs are optional and only affect
+   `git-http-push`, `grep -P`, i18n, the Tcl/Tk GUI, and `git-p4`);
+3. builds in stages (`libgit.a`, then the `git` binary) so progress is visible
+   and incremental relinks stay fast;
+4. verifies the binary runs and that the native `temperature` command is
+   registered.
+
+To drive Git's Makefile directly with the same flags:
+
+```sh
+make -f tools/git/build/git-full.mk git     # build with the captured flags
+make -f tools/git/build/git-full.mk clean
+make -f tools/git/build/git-full.mk print-flags
+```
+
+Note that `resume-budget.o` is part of `LIB_OBJS` in the git Makefile so the
+resume lifecycle symbols link into the binary, and `temperature` is registered
+in `command-list.txt` with a synopsis from `Documentation/git-temperature.adoc`.
+
 ## Repository policy
 
 These tools are infrastructure, not application source. They should remain
