@@ -79,12 +79,15 @@ f = fao()
 
 def find_fao(patterns, element='Production'):
     # Prefer an exact item-name match (case-insensitive) for single-word patterns,
-    # so 'wheat' matches item 'Wheat' and not 'Buckwheat'. Fall back to substring.
+    # so 'wheat' matches item 'Wheat' and not 'Buckwheat'. Also try the FAOSTAT
+    # '<name> (corn)' spelling used for field maize, so 'maize' matches 'Maize (corn)'
+    # and not 'Green maize'. Fall back to substring only if no exact form is found.
     if len(patterns) == 1:
-        target = patterns[0].lower()
-        for (item, el, unit), vals in f.items():
-            if el == element and item.lower() == target:
-                return vals, item, unit
+        t = patterns[0].lower()
+        for cand in (t, f'{t} (corn)'):
+            for (item, el, unit), vals in f.items():
+                if el == element and item.lower() == cand:
+                    return vals, item, unit
     for (item, el, unit), vals in f.items():
         if el == element and all(p.lower() in item.lower() for p in patterns):
             return vals, item, unit
