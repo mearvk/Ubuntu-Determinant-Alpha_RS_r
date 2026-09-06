@@ -114,16 +114,16 @@ Archive build: 2026-09-05.
 | 102 | Lithuania | Europe | ✅ Pulled | `national/lithuania/`; Partial: Statistics Lithuania |
 | 103 | Luxembourg | Europe | ✅ Pulled | `national/luxembourg/`; small state — sparse coverage expected. Partial: STATEC |
 | 104 | Madagascar | Africa | ✅ Pulled | `national/madagascar/`; Partial: INSTAT Madagascar |
-| 105 | Malawi | Africa | ⬜ Not started | |
-| 106 | Malaysia | Asia | ⬜ Not started | |
-| 107 | Maldives | Asia | ⬜ Not started | |
-| 108 | Mali | Africa | ⬜ Not started | |
-| 109 | Malta | Europe | ⬜ Not started | |
-| 110 | Marshall Islands | Oceania | ⬜ Not started | |
-| 111 | Mauritania | Africa | ⬜ Not started | |
-| 112 | Mauritius | Africa | ⬜ Not started | |
-| 113 | Mexico | Americas | ⬜ Not started | |
-| 114 | Micronesia | Oceania | ⬜ Not started | |
+| 105 | Malawi | Africa | ✅ Pulled | `national/malawi/`; Partial: NSO Malawi |
+| 106 | Malaysia | Asia | ✅ Pulled | `national/malaysia/`; Partial: DOSM |
+| 107 | Maldives | Asia | ✅ Pulled | `national/maldives/`; small island state — sparse coverage expected. Partial: Maldives Bureau of Statistics |
+| 108 | Mali | Africa | ✅ Pulled | `national/mali/`; Partial: INSTAT Mali |
+| 109 | Malta | Europe | ✅ Pulled | `national/malta/`; small state — sparse coverage expected. Partial: NSO Malta |
+| 110 | Marshall Islands | Oceania | ✅ Pulled | `national/marshall-islands/`; tiny Pacific state — sparse coverage expected. Partial: EPPSO |
+| 111 | Mauritania | Africa | ✅ Pulled | `national/mauritania/`; sparse coverage expected. Partial: ANSADE |
+| 112 | Mauritius | Africa | ✅ Pulled | `national/mauritius/`; small island state — sparse coverage expected. Partial: Statistics Mauritius |
+| 113 | Mexico | Americas | ✅ Pulled | `national/mexico/`; Partial: INEGI |
+| 114 | Micronesia | Oceania | ✅ Pulled | `national/micronesia/`; tiny Pacific state, FAOSTAT entity "Micronesia (Federated States of)". Partial: FSM Statistics |
 | 115 | Moldova | Europe | ⬜ Not started | |
 | 116 | Monaco | Europe | ⬜ Not started | |
 | 117 | Mongolia | Asia | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 104 — through Madagascar alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Madagascar). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo, Liechtenstein) expectedly sparse.
-- **Remaining (⬜):** 93
+- **Data pulled (✅):** 114 — through Micronesia alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Micronesia). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo, Liechtenstein) expectedly sparse.
+- **Remaining (⬜):** 83
 
 ## Sources
 
@@ -340,6 +340,16 @@ These international families are reproducible baselines used across countries by
 | Lithuania | Statistics Lithuania | PARTIAL | see `national/lithuania/DATA_SOURCES.md` |
 | Luxembourg | STATEC | PARTIAL | small state; sparse coverage expected |
 | Madagascar | INSTAT Madagascar | PARTIAL | see `national/madagascar/DATA_SOURCES.md` |
+| Malawi | NSO Malawi | PARTIAL | see `national/malawi/DATA_SOURCES.md` |
+| Malaysia | DOSM | PARTIAL | see `national/malaysia/DATA_SOURCES.md` |
+| Maldives | Maldives Bureau of Statistics | PARTIAL | small island state; sparse coverage expected |
+| Mali | INSTAT Mali | PARTIAL | see `national/mali/DATA_SOURCES.md` |
+| Malta | NSO Malta | PARTIAL | small state; sparse coverage expected |
+| Marshall Islands | EPPSO | PARTIAL | tiny Pacific state; sparse coverage expected |
+| Mauritania | ANSADE | PARTIAL | sparse coverage expected |
+| Mauritius | Statistics Mauritius | PARTIAL | small island state; sparse coverage expected |
+| Mexico | INEGI | PARTIAL | see `national/mexico/DATA_SOURCES.md` |
+| Micronesia | FSM Statistics | PARTIAL | tiny Pacific state; FAOSTAT entity "Micronesia (Federated States of)" |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
