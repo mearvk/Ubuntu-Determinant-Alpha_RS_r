@@ -104,16 +104,16 @@ Archive build: 2026-09-05.
 | 92 | Kosovo | Europe | ✅ Pulled | `national/kosovo/`; partially recognized — no FAOSTAT entity, so WDI-only (crop cells `N/A`). Partial: ASK |
 | 93 | Kuwait | Asia | ✅ Pulled | `national/kuwait/`; small/desert economy — sparse agriculture. Partial: CSB Kuwait |
 | 94 | Kyrgyzstan | Asia | ✅ Pulled | `national/kyrgyzstan/`; Partial: Natstatcom |
-| 95 | Laos | Asia | ⬜ Not started | |
-| 96 | Latvia | Europe | ⬜ Not started | |
-| 97 | Lebanon | Asia | ⬜ Not started | |
-| 98 | Lesotho | Africa | ⬜ Not started | |
-| 99 | Liberia | Africa | ⬜ Not started | |
-| 100 | Libya | Africa | ⬜ Not started | |
-| 101 | Liechtenstein | Europe | ⬜ Not started | |
-| 102 | Lithuania | Europe | ⬜ Not started | |
-| 103 | Luxembourg | Europe | ⬜ Not started | |
-| 104 | Madagascar | Africa | ⬜ Not started | |
+| 95 | Laos | Asia | ✅ Pulled | `national/laos/`; FAOSTAT entity "Lao People's Democratic Republic". Partial: LSB |
+| 96 | Latvia | Europe | ✅ Pulled | `national/latvia/`; Partial: CSB Latvia |
+| 97 | Lebanon | Asia | ✅ Pulled | `national/lebanon/`; Partial: CAS Lebanon |
+| 98 | Lesotho | Africa | ✅ Pulled | `national/lesotho/`; small state — sparse coverage expected. Partial: BOS Lesotho |
+| 99 | Liberia | Africa | ✅ Pulled | `national/liberia/`; small economy — sparse coverage expected. Partial: LISGIS |
+| 100 | Libya | Africa | ✅ Pulled | `national/libya/`; desert economy — sparse agriculture. Partial: Bureau of Statistics & Census |
+| 101 | Liechtenstein | Europe | ✅ Pulled | `national/liechtenstein/`; microstate — no FAOSTAT entity, WDI-only (crop cells `N/A`). Partial: Office of Statistics |
+| 102 | Lithuania | Europe | ✅ Pulled | `national/lithuania/`; Partial: Statistics Lithuania |
+| 103 | Luxembourg | Europe | ✅ Pulled | `national/luxembourg/`; small state — sparse coverage expected. Partial: STATEC |
+| 104 | Madagascar | Africa | ✅ Pulled | `national/madagascar/`; Partial: INSTAT Madagascar |
 | 105 | Malawi | Africa | ⬜ Not started | |
 | 106 | Malaysia | Asia | ⬜ Not started | |
 | 107 | Maldives | Asia | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 94 — through Kyrgyzstan alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Kyrgyzstan). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo) expectedly sparse.
-- **Remaining (⬜):** 103
+- **Data pulled (✅):** 104 — through Madagascar alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Madagascar). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states and no-FAOSTAT-entity cases (e.g. Kosovo, Liechtenstein) expectedly sparse.
+- **Remaining (⬜):** 93
 
 ## Sources
 
@@ -330,6 +330,16 @@ These international families are reproducible baselines used across countries by
 | Kosovo | ASK | PARTIAL | no FAOSTAT entity; WDI-only, crop cells `N/A` |
 | Kuwait | CSB Kuwait | PARTIAL | desert economy; sparse agriculture |
 | Kyrgyzstan | Natstatcom | PARTIAL | see `national/kyrgyzstan/DATA_SOURCES.md` |
+| Laos | LSB | PARTIAL | FAOSTAT entity "Lao People's Democratic Republic" |
+| Latvia | CSB Latvia | PARTIAL | see `national/latvia/DATA_SOURCES.md` |
+| Lebanon | CAS Lebanon | PARTIAL | see `national/lebanon/DATA_SOURCES.md` |
+| Lesotho | BOS Lesotho | PARTIAL | small state; sparse coverage expected |
+| Liberia | LISGIS | PARTIAL | small economy; sparse coverage expected |
+| Libya | Bureau of Statistics & Census | PARTIAL | desert economy; sparse agriculture |
+| Liechtenstein | Office of Statistics | PARTIAL | microstate; no FAOSTAT entity, WDI-only |
+| Lithuania | Statistics Lithuania | PARTIAL | see `national/lithuania/DATA_SOURCES.md` |
+| Luxembourg | STATEC | PARTIAL | small state; sparse coverage expected |
+| Madagascar | INSTAT Madagascar | PARTIAL | see `national/madagascar/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
