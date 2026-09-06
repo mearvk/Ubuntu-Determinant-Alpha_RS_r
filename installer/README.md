@@ -16,7 +16,23 @@ The current native tool set is maintained by `installer/install-manifest.txt` an
 - `limit` — executable identity/metadata inspection;
 - `size` — recursive logical filesystem-size measurement;
 - `ctrmsctl` — read-only disk/filesystem observation service;
+- `tac3ctl` — userspace diagnostic for the in-kernel TAC3 filesystem;
 - GCC source download/extraction helpers.
+
+### Manifest-driven: adding technology without rebuilding the installer
+
+`installer/install-manifest.txt` is a plain list (`component|source|install-name|default`)
+read at runtime by the `package-installer` binary. Adding a new component is a
+**data change to the manifest, not a code change** — the `package-installer`
+binary does not need to be recompiled. To add technology:
+
+1. put the built artifact under `tools/<name>/` (with a `build.sh`/`Makefile`);
+2. add one line to `install-manifest.txt`: `id|tools/<name>|<artifact>|<default>`;
+3. `package-installer --list` / `--disc <id>` / `--function <kw>` pick it up
+   immediately.
+
+`tac3ctl` was added exactly this way. This keeps the cost of onboarding new
+tools to a single manifest line.
 
 Use the platform master installer:
 

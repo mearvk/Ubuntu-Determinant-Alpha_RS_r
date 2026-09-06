@@ -70,3 +70,28 @@ make cpp-clean    # removes the object
 
 The C++ port and the C kernel module are kept as parallel expressions of the
 same model; keep them in sync when the engine changes.
+
+
+## ISO and installer integration
+
+TAC3 is wired into the distribution in two complementary ways:
+
+1. **ISO / kernel (the filesystem module).** `CONFIG_TAC3=m` is set in the
+   kernel defconfig (`arch/x86/configs/galactic_cherry_defconfig`) and the
+   checked-in `.config`, alongside `CONFIG_NEGAMANE=m`. The normal build flow
+   (`make kernel-defconfig && make kernel-install && make iso`) compiles
+   `tac3.ko`, `modules_install` copies it into the rootfs
+   (`/lib/modules/<ver>/`), and `scripts/gen-iso.sh` folds the rootfs into
+   `filesystem.squashfs` — so TAC3 ships on the ISO. No change to
+   `gen-iso.sh` is needed; enabling the CONFIG symbol is sufficient.
+
+2. **Binary installer (the userspace tool).** `tac3ctl` (`tools/tac3/`, built
+   from the C++ port) is registered in `installer/install-manifest.txt`:
+
+   ```text
+   tac3ctl|tools/tac3|tac3ctl|1
+   ```
+
+   The `package-installer` binary reads that manifest at runtime, so `tac3ctl`
+   is installed into `/user/bin` and `/deck/bin` **without recompiling the
+   installer**. Adding future technology is likewise a one-line manifest change.

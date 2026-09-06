@@ -8,9 +8,9 @@
 
 SHELL := /bin/sh
 
-TOOLS := pcopy pmove muntutils
+TOOLS := pcopy pmove muntutils tac3
 
-.PHONY: all pcopy pmove muntutils install uninstall clean
+.PHONY: all pcopy pmove muntutils tac3 install uninstall clean
 
 all: $(TOOLS)
 
@@ -25,17 +25,25 @@ pmove: pcopy
 muntutils:
 	$(MAKE) -C muntutils all
 
+# tac3ctl — userspace diagnostic for the in-kernel TAC3 filesystem. Independent
+# of the pcopy/pmove chain; builds from its own portable C++ engine.
+tac3:
+	$(MAKE) -C tac3 all
+
 install: all
 	$(MAKE) -C pcopy install
 	$(MAKE) -C pmove install
 	$(MAKE) -C muntutils install
+	$(MAKE) -C tac3 install
 
 uninstall:
 	$(MAKE) -C pmove uninstall
 	$(MAKE) -C pcopy uninstall
 	$(MAKE) -C muntutils uninstall
+	$(MAKE) -C tac3 uninstall
 
 clean:
 	$(MAKE) -C pmove clean
 	$(MAKE) -C pcopy clean
 	$(MAKE) -C muntutils clean
+	$(MAKE) -C tac3 clean
