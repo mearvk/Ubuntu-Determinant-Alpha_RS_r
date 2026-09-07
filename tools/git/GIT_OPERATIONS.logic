@@ -2,7 +2,7 @@
 # UTF-8 plain text, line-oriented .logic contract
 
 LOGIC-VERSION: 1
-OPERATIONS: premount,add,commit,push,resume,merge,rebase,restage,autocheck,moral,temperature,alter-comment
+OPERATIONS: premount,add,commit,push,resume,merge,rebase,restage,autocheck,moral,temperature,alter-comment,propath
 
 [ORIGINAL]
 RULE: Preserve each operation's ordinary Git file and history semantics.
@@ -139,6 +139,21 @@ LINEAR: The addressed range must be a deterministic linear history; arbitrary DA
 PROVENANCE: Preserve author, committer, date, timestamp, parent object, and relevant object references; record prior operation when chained.
 OVERFLOW: Rewrite-count arithmetic rejects integer overflow rather than wrapping.
 RULE: alter-comment changes messages only; it never adds, removes, or reorders commits, and it never rewrites history it was not explicitly asked to address.
+
+[PROPATH]
+METHOD: Path-scoped, lazily-expanding partial clone: `git propath URL [PATH ...]` clones only a tuple of paths, then fetches the rest on demand.
+SCOPE: The PATH arguments form the initial scope tuple of repo-relative directories; everything outside the scope is left unmaterialized.
+STATE: A scoped path is declared (in scope, not materialized), materialized (present locally), or evicted (local copy removed, still in scope, re-fetchable).
+EXPAND: shallow (default) materializes one directory level and fetches subdirectories only when reached (iterative); recursive materializes the whole subtree on first use.
+FETCH: A declared or evicted path needs fetch; reaching for it transparently materializes it again.
+EVICT: A materialized path idle for its TTL becomes an eviction candidate; default TTL is 2 days (172800 seconds).
+EVICT-SAFETY: Only materialized paths are evicted; eviction removes only the clean, re-fetchable local copy and never deletes committed or un-pushed work.
+TTL-ZERO: A TTL of zero means never auto-evict, not evict immediately; eviction may also be disabled entirely.
+IDLE: Idle age is now-minus-last-used with clock skew treated as just-used; age never goes negative.
+CONFIG: Defaults come from a per-repository config file (recommended `.propath`): URL, TTL-DAYS/TTL-SECONDS, EVICT, EXPAND, and PATH scope entries.
+OVERFLOW: Eviction-candidate counting rejects integer overflow rather than wrapping.
+PROVENANCE: Preserve author, committer, date, timestamp, parent object, and relevant path references; record prior operation when chained.
+RULE: propath is advisory local scope/cache bookkeeping; it never rewrites history, never changes remote object identity, and a stale or altered config never authorizes deleting un-pushed work.
 
 [CHAIN]
 RULE: Every operation may record PRIOR-OPERATION and PARENT-COMMIT.

@@ -77,7 +77,7 @@ in `git/` (a `<op>.h` contract plus C and C++ companions), a metadoc, and a
 block in `GIT_OPERATIONS.logic`. The current operation set is:
 
 ```
-premount, add, commit, push, resume, merge, rebase, restage, autocheck, moral, temperature, alter-comment
+premount, add, commit, push, resume, merge, rebase, restage, autocheck, moral, temperature, alter-comment, propath
 ```
 
 Highlights:
@@ -96,6 +96,10 @@ Highlights:
 - **alter-comment** — `git alter-comment X "message"` alters only the messages
   of the last `X` commits, addressed by an integer count; trees, authorship, and
   dates are preserved (`alter-comment.h`, see `ALTER_COMMENT.md`).
+- **propath** — `git propath URL [PATH ...]` clones only a tuple of paths and
+  fetches the rest on demand (shallow/iterative or recursive), evicting unused
+  local copies after ~2 days; config-file driven (`propath.h`, see
+  `PROPATH.md`).
 
 ## Native push policy
 
@@ -265,5 +269,6 @@ prevents an oversized push effort from being attempted.
 | `REBASE_METADOC.md` / `REBASE_MERGE_METADOC.md` | rebase / merge metadata |
 | `MORAL.md` | symbolic blessing operation |
 | `ALTER_COMMENT.md` | integer-addressed commit-message alteration |
+| `PROPATH.md` | path-scoped lazily-expanding partial clone + idle eviction |
 | `FOUNDING.md`, `EXPLANATIONS.md` | project rationale and detailed notes |
 | `GIT_OPERATIONS.logic` | the line-oriented operation contract |

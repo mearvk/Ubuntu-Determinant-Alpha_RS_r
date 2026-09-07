@@ -33,7 +33,8 @@ C_SOURCES := \
 	$(GIT_SRC)/moral.c \
 	$(GIT_SRC)/premount.c \
 	$(GIT_SRC)/temperature.c \
-	$(GIT_SRC)/alter-comment.c
+	$(GIT_SRC)/alter-comment.c \
+	$(GIT_SRC)/propath.c
 
 CPP_SOURCES := \
 	$(GIT_SRC)/add-budget.cpp \
@@ -45,7 +46,8 @@ CPP_SOURCES := \
 	$(GIT_SRC)/moral.cpp \
 	$(GIT_SRC)/premount.cpp \
 	$(GIT_SRC)/temperature.cpp \
-	$(GIT_SRC)/alter-comment.cpp
+	$(GIT_SRC)/alter-comment.cpp \
+	$(GIT_SRC)/propath.cpp
 
 C_OBJECTS := $(patsubst $(GIT_SRC)/%.c,$(BUILD_DIR)/c-%.o,$(C_SOURCES))
 CPP_OBJECTS := $(patsubst $(GIT_SRC)/%.cpp,$(BUILD_DIR)/cpp-%.o,$(CPP_SOURCES))
@@ -56,7 +58,7 @@ OBJECTS := $(C_OBJECTS) $(CPP_OBJECTS)
 all: native-policy archive
 
 native-policy: $(OBJECTS)
-	@echo "Native policy sources compiled: add, commit, push, merge, rebase, restage, autocheck, moral, premount, temperature, alter-comment"
+	@echo "Native policy sources compiled: add, commit, push, merge, rebase, restage, autocheck, moral, premount, temperature, alter-comment, propath"
 
 archive: $(LIB)
 
@@ -74,7 +76,7 @@ $(BUILD_DIR)/cpp-%.o: $(GIT_SRC)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(COMMON_CPPFLAGS) -c $< -o $@
 
 check: native-policy
-	@for header in add-budget.h commit-budget.h rebase-metadoc.h merge-metadoc.h operation-logic.h restage.h autocheck.h moral.h premount.h resume-budget.h temperature.h alter-comment.h; do \
+	@for header in add-budget.h commit-budget.h rebase-metadoc.h merge-metadoc.h operation-logic.h restage.h autocheck.h moral.h premount.h resume-budget.h temperature.h alter-comment.h propath.h; do \
 		test -f $(GIT_SRC)/$$header || { echo "missing header: $$header"; exit 1; }; \
 	done
 	@echo "Native policy source/header set is complete."

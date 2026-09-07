@@ -1,0 +1,66 @@
+# Ubuntu Determinant `propath` configuration (example).
+#
+# A per-repository config file for `git propath URL [PATH ...]`. It seeds the
+# scope tuple (the directories initially cloned), how each scoped path expands
+# on use, and the idle time-to-live before an unused local copy is evicted.
+#
+# Format: UTF-8, line-oriented `KEY: value`. Blank lines and `#` comments are
+# ignored. Keys are case-insensitive; the first occurrence of a scalar key
+# wins. Multiple PATH: lines accumulate into the scope tuple, in order.
+#
+# The recommended location is `.propath` at the repository root (see
+# PROPATH.md). This file mirrors the native `struct git_propath_config` in
+# git/propath.h; a stale or altered config can never authorize deleting
+# un-pushed local work.
+
+PROPATH-VERSION: 1
+
+# --- Source ------------------------------------------------------------------
+# The repository this scope is cloned from. Required; must be non-empty.
+URL: https://example.com/group/repository.git
+
+# --- Idle eviction -----------------------------------------------------------
+# TTL-DAYS is the idle age, in days, after which a *materialized* scoped path
+# becomes an eviction candidate. Default is 2 (~172800 seconds). Eviction
+# removes only the clean, re-fetchable local copy; the scope entry is retained
+# so the path is transparently re-fetched on next use.
+#
+# TTL-SECONDS may be given instead for finer control; when both are present,
+# TTL-SECONDS wins. A value of 0 means "never auto-evict" (eviction disabled),
+# NOT "evict immediately" — nothing is ever deleted merely because TTL is 0.
+TTL-DAYS: 2
+# TTL-SECONDS: 172800
+
+# EVICT toggles idle eviction entirely. true (default) enables it; false keeps
+# every materialized path until it is explicitly released.
+EVICT: true
+
+# --- Expansion ---------------------------------------------------------------
+# EXPAND is the default expansion mode for scoped paths that do not set their
+# own. `shallow` (default) materializes one directory level at a time and
+# fetches subdirectories only when they are themselves reached (iterative).
+# `recursive` materializes a scoped path and its whole subtree on first use.
+EXPAND: shallow
+
+# --- Scope tuple -------------------------------------------------------------
+# One PATH: line per scoped directory, repo-relative. These are the portion of
+# the repository cloned up front; everything else is fetched lazily on demand.
+# An optional trailing mode overrides EXPAND for that path:
+#     PATH: <repo-relative-dir> [shallow|recursive]
+PATH: tools/git shallow
+PATH: countries/japan recursive
+PATH: markdown
+
+# --- Provenance (optional) ---------------------------------------------------
+# Recorded when a scope/cache record is emitted; missing values are absent,
+# never invented.
+# AUTHOR: <git-author>
+# COMMITTER: <git-committer>
+# DATE: <YYYY-MM-DD>
+# TIMESTAMP: <ISO-8601 timestamp>
+# PARENT-COMMIT: <commit object id>
+# TIER: <TIER-1|TIER-2|PRIORI-INTEGRATION|UPLOAD>
+
+# RULE: Advisory local scope/cache bookkeeping only. propath never rewrites
+# history, never changes remote object identity, and eviction never deletes
+# committed or un-pushed local work — only clean, re-fetchable cached copies.
