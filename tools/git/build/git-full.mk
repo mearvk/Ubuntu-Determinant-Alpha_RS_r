@@ -50,21 +50,20 @@ GIT_SRC ?= ../git
 # ---------------------------------------------------------------------------
 # Message catalog + diagnostic hook (always linked).
 #
-# git.c installs the message system at startup by calling gitmsg_listen_init()
-# and gitmsg_diag_install(). Those symbols therefore must link into every
-# build, so the catalog object set is appended to LIB_OBJS in BOTH targets:
+# git.c installs the message system at startup (gitmsg_listen_init +
+# gitmsg_diag_install), and the `messages` builtin uses the loader, so the
+# catalog object set must link into every build. Those objects are listed
+# directly in Git's own Makefile LIB_OBJS (alongside resume-budget.o):
 #
 #   messages.o        the compiled default catalog + validate/lookup;
 #   gitmsg-config.o   the .gitmessages loader ([MESSAGE] overrides + [MAP]);
 #   gitmsg-listen.o   the listener state, catalog init, and resolve helpers;
 #   gitmsg-diag.o     the die/error/warning routine hook.
 #
-# Without the force-include flags (plain `git` target) the print primitives are
-# NOT interposed, but the diagnostic hook and .gitmessages loading are still
-# active — structured die/error/warning already resolve through the catalog,
-# and with no config present everything falls back to Git's own behaviour.
+# so no LIB_OBJS override is needed here. The plain `git` target therefore
+# already has the diagnostic hook, .gitmessages loading, and `git messages`;
+# only the raw-print interposition below is opt-in.
 # ---------------------------------------------------------------------------
-GITMSG_CATALOG_OBJS := messages.o gitmsg-config.o gitmsg-listen.o gitmsg-diag.o
 
 # ---------------------------------------------------------------------------
 # Tree-wide print listener (opt-in force-include).
@@ -86,18 +85,15 @@ GITMSG_LISTEN_FLAGS := -DGITMSG_LISTEN -include gitmsg-listen.h
 
 .PHONY: git clean print-flags git-listen print-listen-flags gitmsg
 
-# Ordinary Edition git: catalog + diagnostic hook linked in; raw prints are
-# NOT interposed (no force-include).
+# Ordinary Edition git: catalog, diagnostic hook, and `git messages` are linked
+# in via the tree Makefile's LIB_OBJS; raw prints are NOT interposed.
 git:
-	$(MAKE) -C $(GIT_SRC) $(GIT_FULL_FLAGS) \
-		LIB_OBJS="$$LIB_OBJS $(GITMSG_CATALOG_OBJS)" \
-		git
+	$(MAKE) -C $(GIT_SRC) $(GIT_FULL_FLAGS) git
 
 # Same as `git`, plus the tree-wide print interposition force-include.
 git-listen:
 	$(MAKE) -C $(GIT_SRC) $(GIT_FULL_FLAGS) \
 		CFLAGS="$$CFLAGS $(GITMSG_LISTEN_FLAGS)" \
-		LIB_OBJS="$$LIB_OBJS $(GITMSG_CATALOG_OBJS)" \
 		git
 
 # ---------------------------------------------------------------------------

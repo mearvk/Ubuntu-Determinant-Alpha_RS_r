@@ -274,6 +274,7 @@ int cmd_upload_archive_writer(int argc, const char **argv, const char *prefix, s
 int cmd_upload_pack(int argc, const char **argv, const char *prefix, struct repository *repo);
 int cmd_url_parse(int argc, const char **argv, const char *prefix, struct repository *repo);
 int cmd_var(int argc, const char **argv, const char *prefix, struct repository *repo);
+int cmd_messages(int argc, const char **argv, const char *prefix, struct repository *repo);
 int cmd_verify_commit(int argc, const char **argv, const char *prefix, struct repository *repo);
 int cmd_verify_tag(int argc, const char **argv, const char *prefix, struct repository *repo);
 int cmd_version(int argc, const char **argv, const char *prefix, struct repository *repo);

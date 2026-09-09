@@ -183,7 +183,14 @@ gitmsg rules       # the resolved [MAP] rules
 gitmsg --config <file> <cmd>   # inspect a specific file
 ```
 
-The same is reachable through the workflow wrapper, which prefers the native
+The same inspection is a first-class git subcommand, registered as a builtin
+(`builtin/messages.c`, in `command-list.txt` and the `git.c` command table):
+
+```sh
+git messages [--config <file>] [path|validate|list|rules]
+```
+
+and is also reachable through the workflow wrapper, which prefers the native
 `gitmsg` and otherwise falls back to its own built-in wordings:
 
 ```sh
