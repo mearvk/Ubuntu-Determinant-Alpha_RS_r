@@ -111,6 +111,21 @@ verify() {
     echo "VERIFY FAIL: 'temperature' not listed by 'git help -a'" >&2
     return 1
   fi
+  # The `messages` builtin (catalog / .gitmessages inspector) should register.
+  if printf '%s\n' "$help_all" | grep -q "messages"; then
+    echo "verify: 'messages' command is registered"
+  else
+    echo "VERIFY FAIL: 'messages' not listed by 'git help -a'" >&2
+    return 1
+  fi
+  # And it should actually run: with no config, validate reports the compiled
+  # defaults are in effect and exits 0.
+  if "$git_bin" messages validate >/dev/null 2>&1; then
+    echo "verify: 'git messages validate' runs (compiled defaults OK)"
+  else
+    echo "VERIFY FAIL: 'git messages validate' did not run cleanly" >&2
+    return 1
+  fi
   # push.resumeAttempts config knob should be recognized by our builtin push.
   if "$git_bin" -c push.resumeattempts=3 config --get push.resumeattempts >/dev/null 2>&1; then
     echo "verify: push.resumeAttempts config recognized"
