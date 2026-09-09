@@ -1,0 +1,49 @@
+# Example .gitmessages — copy to the root of a repository as `.gitmessages`
+# (or point $GIT_MESSAGES_CONFIG at it) to customize the Edition Git's output.
+#
+# Two things live here:
+#   1. [MESSAGE <id>] blocks re-word / re-stream individual catalog messages.
+#   2. [MAP] lines map an intercepted output (by call site or text) to one of
+#      those catalog messages, so the binary emits your wording instead.
+#
+# Everything is optional and safe: anything you don't set keeps the built-in
+# default, and an override that would hide a diagnostic (an error/fatal routed
+# to stdout, or an emptied message) is ignored. Check your file any time with:
+#
+#     git-workflow.sh messages . validate      # or: gitmsg validate
+#     git-workflow.sh messages . list          #     gitmsg list
+#     git-workflow.sh messages . rules         #     gitmsg rules
+#
+# The full reference (all message ids, all keys) is in
+# tools/git/git/messages.config.example and tools/git/MESSAGES.md.
+
+MESSAGES-VERSION: 1
+
+# --- Re-word a couple of messages -------------------------------------------
+# Keys: TEXT (required), STREAM (stdout|stderr), SEVERITY (info|note|warning|
+# error|fatal). Stream/severity default to the message's built-in values.
+
+[MESSAGE disk-space]
+TEXT: Your disk is full. Free some space and run the command again.
+
+[MESSAGE not-a-repo]
+TEXT: This folder is not a Git repository yet. Run 'git init' to start one.
+
+# --- Map real output to catalog messages ------------------------------------
+# Selectors (all optional; omitted = match anything):
+#   file=<substr>   the source file the print came from
+#   func=<substr>   the function the print came from
+#   text=<...>      text the output contains (may be multiple words; put it LAST)
+# First matching rule wins.
+
+[MAP]
+
+# Turn any "No space left on device" complaint into the friendly disk-space
+# message above.
+MAP: text=No space left on device -> disk-space
+
+# A "unable to read" from the loose-object reader -> the missing-file message.
+MAP: file=object-file.c text=unable to read -> missing-file
+
+# A permission complaint while taking a lock -> the permission message.
+MAP: func=lock_file text=Permission denied -> permission

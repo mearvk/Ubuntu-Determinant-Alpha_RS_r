@@ -40,6 +40,7 @@ Usage:
   git-workflow.sh commit-parts [repo] <message>
   git-workflow.sh push-resume [repo] [remote] [branch] [--attempts N]
   git-workflow.sh temperature [repo] [--recandle] [--min-idle DAYS]
+  git-workflow.sh messages [repo] [path|validate|list|rules]
 EOF
   exit 2
 }
@@ -769,6 +770,51 @@ case "$command" in
     echo
     echo "Note: temperature is advisory and read-only; it stages/commits/pushes nothing."
     echo "      Scores use observable project signals only, never identity or credentials."
+    ;;
+
+  messages)
+    # Inspect the message catalog and .gitmessages config. Prefers the native
+    # `gitmsg` inspector (built alongside the Edition git; identical to what the
+    # binary applies); falls back to this wrapper's own catalog when it is not
+    # present. See tools/git/MESSAGES.md.
+    #
+    #   git-workflow.sh messages [repo] [path|validate|list|rules]
+    sub="${3:-list}"
+    GITMSG_BIN=""
+    for cand in "$WF_SCRIPT_DIR/git/gitmsg" "$WF_SCRIPT_DIR/build/.native-policy/gitmsg" gitmsg; do
+      if command -v "$cand" >/dev/null 2>&1 || [ -x "$cand" ]; then GITMSG_BIN="$cand"; break; fi
+    done
+    if [ -n "$GITMSG_BIN" ]; then
+      cfg="$(wf_msg_config_path)"
+      if [ -n "$cfg" ]; then
+        exec "$GITMSG_BIN" --config "$cfg" "$sub"
+      else
+        exec "$GITMSG_BIN" "$sub"
+      fi
+    fi
+    # Fallback: report using the shell catalog this wrapper already loaded.
+    case "$sub" in
+      path)
+        cfg="$(wf_msg_config_path)"
+        [ -n "$cfg" ] && echo "$cfg" || echo "(no .gitmessages found; using built-in wordings)"
+        ;;
+      validate)
+        echo "Native 'gitmsg' inspector not built; the shell wrapper's built-in wordings are in effect."
+        echo "Build it with: make -f build/git-full.mk git-listen  (or see MESSAGES.md)."
+        ;;
+      list)
+        for id in "${!WF_MSG_TEXT[@]}"; do
+          printf "%-20s %-7s %s\n" "$id" "${WF_MSG_STREAM[$id]:-stderr}" "${WF_MSG_TEXT[$id]}"
+        done | sort
+        ;;
+      rules)
+        echo "MAP rules are applied by the native binary; the shell wrapper does not evaluate them."
+        ;;
+      *)
+        echo "usage: git-workflow.sh messages [repo] [path|validate|list|rules]" >&2
+        exit 2
+        ;;
+    esac
     ;;
 
   *)

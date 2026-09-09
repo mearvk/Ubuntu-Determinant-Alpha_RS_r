@@ -175,7 +175,11 @@ RESOLVE: The [MAP] rules match on file/function/text substrings, first match win
 DEFAULT: The shipped map is empty, so enabling the listener changes no output; Git data output is altered only where a rule explicitly maps it.
 STDERR-SAFETY: A rule resolving to an error/fatal message may not route it to stdout; such a match is refused and the original bytes pass through, so a diagnostic is never hidden.
 SELF-EXCLUSION: The listener translation unit defines GITMSG_LISTEN_IMPL so its own shims call the real libc functions rather than recursing.
-BUILD: Opt-in. The known-good `git` build is unchanged; the listener links via the `git-listen` target (force-include plus gitmsg-listen.o/messages.o in LIB_OBJS).
+CONFIG-LOAD: A native loader reads .gitmessages ($GIT_MESSAGES_CONFIG, else ./.gitmessages) at startup, overlaying [MESSAGE] TEXT/STREAM/SEVERITY onto the default catalog and building the [MAP] rule table; an unsafe overlay is discarded and the compiled defaults restored.
+DIAGNOSTICS: A hook installs die/error/warning routines (set_die/error/warn_routine) so structured diagnostics also resolve through the catalog; unmatched diagnostics defer to Git's original routine and die preserves NORETURN with exit 128.
+ALWAYS-ON: The catalog, config loader, and diagnostic hook link into every build; only the raw-print interposition (the force-include) is opt-in via git-listen.
+INSPECT: The gitmsg tool (and `git-workflow.sh messages`) reports the resolved config path, catalog, and rules using the same loader the binary uses; validate warns when unsafe overrides were dropped.
+BUILD: The known-good `git` build links the catalog + loader + diagnostic hook (LIB_OBJS); the raw-print listener is added by the `git-listen` target (force-include of gitmsg-listen.h).
 SCOPE-LIMIT: Only stdout/stderr print primitives are interposed; trace and log-file sinks are out of scope by design.
 RULE: The listener observes and, only where mapped, re-words or re-streams output; it never alters Git's payload output by default and never changes operation behaviour.
 

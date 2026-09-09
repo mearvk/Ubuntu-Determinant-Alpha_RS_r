@@ -28,55 +28,50 @@
 
 #include "gitmsg-listen.h"
 #include "messages.h"
+#include "gitmsg-config.h"
 
 /* ------------------------------------------------------------------------- *
  * Catalog + mapping state.
  *
- * The catalog (compiled defaults, optionally overlaid by a validated config)
- * and the site/pattern -> message-id map are loaded once, lazily, on the first
- * intercepted write. If loading or validation fails, the listener runs in pure
- * pass-through mode: it never fails a write and never invents a message.
+ * The catalog (compiled defaults, optionally overlaid by a validated
+ * .gitmessages) and the [MAP] rule table are loaded once — either explicitly
+ * at startup via gitmsg_listen_init(), or lazily on the first intercepted
+ * write. If loading fails at any point the listener runs in pure pass-through
+ * mode: it never fails a write and never invents a message.
  * ------------------------------------------------------------------------- */
 
-struct gitmsg_map_rule {
-	const char *file_substr;    /* match when call-site file contains this  */
-	const char *func_substr;    /* match when call-site function contains it */
-	const char *text_substr;    /* match when rendered text contains this    */
-	enum git_msg_id id;         /* catalog message to emit on a match        */
-};
+#define GITMSG_MAX_RULES 256
+#define GITMSG_ARENA_SZ  (64 * 1024)
 
-/*
- * Built-in default map: intentionally EMPTY. With no rules, every intercepted
- * write is passed through verbatim — the safe default. Real deployments add
- * rules through the config's [MAP] section (loaded by the C config loader),
- * which appends to this table at startup. Keeping the compiled default empty
- * guarantees that merely enabling the listener changes no output.
- */
-static const struct gitmsg_map_rule gitmsg_default_map[] = {
-	{ NULL, NULL, NULL, GIT_MSG_ID__COUNT } /* sentinel; zero real rules */
-};
-
-static struct git_msg_entry gitmsg_catalog[GIT_MSG_ID__COUNT];
+static struct gitmsg_config gitmsg_cfg;
+static struct gitmsg_rule   gitmsg_rules[GITMSG_MAX_RULES];
+static char                 gitmsg_arena[GITMSG_ARENA_SZ];
 static size_t gitmsg_catalog_n;      /* 0 until loaded / usable          */
 static int gitmsg_ready;             /* 1 once initialization has run    */
 
 /*
- * One-time initialization. Loads the compiled default catalog and validates
- * it; a future C config loader (see MESSAGES.md) may overlay .gitmessages here
- * and re-validate. On any failure gitmsg_catalog_n stays 0 -> pass-through.
+ * Load (or reload) the catalog and [MAP] rules from `repo_root`'s .gitmessages
+ * (or $GIT_MESSAGES_CONFIG). Safe to call more than once; a NULL/empty
+ * repo_root and a missing file both yield the compiled defaults with no rules.
+ * This is the explicit entry point installed at program startup.
  */
+void gitmsg_listen_init(const char *repo_root)
+{
+	const char *path = gitmsg_config_path(repo_root);
+
+	gitmsg_config_load(path, &gitmsg_cfg, gitmsg_rules, GITMSG_MAX_RULES,
+			   gitmsg_arena, sizeof(gitmsg_arena));
+	gitmsg_catalog_n = gitmsg_cfg.catalog_count;
+	gitmsg_ready = 1;
+}
+
+/* Lazy fallback for shims that fire before an explicit init. */
 static void gitmsg_init_once(void)
 {
 	if (gitmsg_ready)
 		return;
-	gitmsg_ready = 1;
-
-	if (git_msg_default_catalog(gitmsg_catalog, GIT_MSG_ID__COUNT)
-	    == (size_t)GIT_MSG_ID__COUNT &&
-	    git_msg_catalog_validate(gitmsg_catalog, GIT_MSG_ID__COUNT) == 0)
-		gitmsg_catalog_n = GIT_MSG_ID__COUNT;
-	else
-		gitmsg_catalog_n = 0; /* unusable -> pass-through */
+	/* No repo context known here; resolve via env or compiled defaults. */
+	gitmsg_listen_init(NULL);
 }
 
 static int gitmsg_str_contains(const char *hay, const char *needle)
@@ -88,10 +83,10 @@ static int gitmsg_str_contains(const char *hay, const char *needle)
 
 /*
  * Resolve an intercepted write to a catalog entry, or NULL for pass-through.
- * Matching is by the [MAP] rules on file/function/text substrings. A resolved
- * entry whose severity is error/fatal but whose stream is not stderr is refused
- * (returns NULL -> the original bytes pass through) so a diagnostic is never
- * demoted onto stdout by a mapping.
+ * Matching is by the loaded [MAP] rules on file/function/text substrings; the
+ * first matching rule wins. A resolved entry whose severity is error/fatal but
+ * whose stream is not stderr is refused (returns NULL -> the original bytes
+ * pass through) so a diagnostic is never demoted onto stdout by a mapping.
  */
 static const struct git_msg_entry *gitmsg_resolve(FILE *stream,
 						  const char *file,
@@ -106,14 +101,14 @@ static const struct git_msg_entry *gitmsg_resolve(FILE *stream,
 	if (stream != stdout && stream != stderr)
 		return NULL;
 
-	for (i = 0; gitmsg_default_map[i].id != GIT_MSG_ID__COUNT; i++) {
-		const struct gitmsg_map_rule *r = &gitmsg_default_map[i];
+	for (i = 0; i < gitmsg_cfg.rule_count; i++) {
+		const struct gitmsg_rule *r = &gitmsg_rules[i];
 
 		if (gitmsg_str_contains(file, r->file_substr) &&
 		    gitmsg_str_contains(func, r->func_substr) &&
 		    gitmsg_str_contains(text, r->text_substr)) {
 			const struct git_msg_entry *e =
-				git_msg_lookup(gitmsg_catalog,
+				git_msg_lookup(gitmsg_cfg.catalog,
 					       gitmsg_catalog_n, r->id);
 			if (!e)
 				return NULL;
@@ -124,6 +119,20 @@ static const struct git_msg_entry *gitmsg_resolve(FILE *stream,
 		}
 	}
 	return NULL;
+}
+
+/*
+ * Public resolution helper for the diagnostic hook (gitmsg-diag.c): given a
+ * severity and rendered text, return the catalogued entry a [MAP] rule selects,
+ * or NULL to keep Git's own wording. `func`/`file` may be NULL (unknown site).
+ */
+const struct git_msg_entry *gitmsg_resolve_diag(const char *file,
+						const char *func,
+						const char *text)
+{
+	gitmsg_init_once();
+	/* Diagnostics are stderr by nature; resolve against the stderr path. */
+	return gitmsg_resolve(stderr, file, func, text);
 }
 
 /* Emit a resolved catalog entry on its configured stream. */

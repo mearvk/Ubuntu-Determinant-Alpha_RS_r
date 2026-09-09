@@ -48,43 +48,75 @@ GIT_FULL_REQUIRED_TOOLS := cmp diff
 GIT_SRC ?= ../git
 
 # ---------------------------------------------------------------------------
-# Tree-wide print listener (opt-in).
+# Message catalog + diagnostic hook (always linked).
 #
-# The message listener (git/gitmsg-listen.{h,c}) interposes every stdout/stderr
-# print primitive across the whole tree, so each write carries its call site to
-# the message catalog before it is emitted. It is wired here as an *opt-in*
-# build so the known-good `git` target above stays byte-for-byte as validated:
+# git.c installs the message system at startup by calling gitmsg_listen_init()
+# and gitmsg_diag_install(). Those symbols therefore must link into every
+# build, so the catalog object set is appended to LIB_OBJS in BOTH targets:
+#
+#   messages.o        the compiled default catalog + validate/lookup;
+#   gitmsg-config.o   the .gitmessages loader ([MESSAGE] overrides + [MAP]);
+#   gitmsg-listen.o   the listener state, catalog init, and resolve helpers;
+#   gitmsg-diag.o     the die/error/warning routine hook.
+#
+# Without the force-include flags (plain `git` target) the print primitives are
+# NOT interposed, but the diagnostic hook and .gitmessages loading are still
+# active — structured die/error/warning already resolve through the catalog,
+# and with no config present everything falls back to Git's own behaviour.
+# ---------------------------------------------------------------------------
+GITMSG_CATALOG_OBJS := messages.o gitmsg-config.o gitmsg-listen.o gitmsg-diag.o
+
+# ---------------------------------------------------------------------------
+# Tree-wide print listener (opt-in force-include).
+#
+# On top of the always-linked objects, the `git-listen` target force-includes
+# gitmsg-listen.h into every translation unit so the raw print primitives
+# (printf/fprintf/fputs/...) are interposed too, carrying their call site to the
+# catalog. This is kept separate so the print-interposition surface is an
+# explicit opt-in; the listener's own TU defines GITMSG_LISTEN_IMPL, so the
+# force-include is inert there and it calls the real libc functions.
 #
 #   GITMSG_LISTEN_FLAGS injects, into the compile of every translation unit,
 #     -DGITMSG_LISTEN            enable the macros in gitmsg-listen.h, and
 #     -include gitmsg-listen.h   force-include it after the system headers.
-#   The listener object (gitmsg-listen.o) plus messages.o are appended to
-#   LIB_OBJS so the shims and the catalog link into the binary (the same
-#   mechanism used for resume-budget.o).
-#
-# The listener's own translation unit defines GITMSG_LISTEN_IMPL, so the
-# force-include is inert inside it and it calls the real libc functions.
 #
 # Build it with:   make -f git-full.mk git-listen
 # ---------------------------------------------------------------------------
 GITMSG_LISTEN_FLAGS := -DGITMSG_LISTEN -include gitmsg-listen.h
-GITMSG_LISTEN_OBJS  := gitmsg-listen.o messages.o
 
-.PHONY: git clean print-flags git-listen
+.PHONY: git clean print-flags git-listen print-listen-flags gitmsg
 
+# Ordinary Edition git: catalog + diagnostic hook linked in; raw prints are
+# NOT interposed (no force-include).
 git:
-	$(MAKE) -C $(GIT_SRC) $(GIT_FULL_FLAGS) git
+	$(MAKE) -C $(GIT_SRC) $(GIT_FULL_FLAGS) \
+		LIB_OBJS="$$LIB_OBJS $(GITMSG_CATALOG_OBJS)" \
+		git
 
-# Same flag set as `git`, plus the tree-wide listener force-include and the
-# listener/catalog objects linked into libgit.a via LIB_OBJS.
+# Same as `git`, plus the tree-wide print interposition force-include.
 git-listen:
 	$(MAKE) -C $(GIT_SRC) $(GIT_FULL_FLAGS) \
 		CFLAGS="$$CFLAGS $(GITMSG_LISTEN_FLAGS)" \
-		LIB_OBJS="$$LIB_OBJS $(GITMSG_LISTEN_OBJS)" \
+		LIB_OBJS="$$LIB_OBJS $(GITMSG_CATALOG_OBJS)" \
 		git
+
+# ---------------------------------------------------------------------------
+# gitmsg — the friendly inspector for the catalog and .gitmessages config.
+# Self-contained: links only the loader + catalog, no git objects. Reports
+# exactly what the binary would apply (path / validate / list / rules).
+#
+#   make -f git-full.mk gitmsg     # builds ../git/gitmsg
+# ---------------------------------------------------------------------------
+GITMSG_CLI_CC  ?= cc
+GITMSG_CLI_SRC := $(GIT_SRC)/gitmsg-cli.c $(GIT_SRC)/gitmsg-config.c $(GIT_SRC)/messages.c
+
+gitmsg:
+	$(GITMSG_CLI_CC) -O2 -I$(GIT_SRC) $(GITMSG_CLI_SRC) -o $(GIT_SRC)/gitmsg
+	@echo "Built $(GIT_SRC)/gitmsg — try: $(GIT_SRC)/gitmsg list"
 
 clean:
 	$(MAKE) -C $(GIT_SRC) $(GIT_FULL_FLAGS) clean
+	$(RM) $(GIT_SRC)/gitmsg
 
 print-flags:
 	@echo $(GIT_FULL_FLAGS)

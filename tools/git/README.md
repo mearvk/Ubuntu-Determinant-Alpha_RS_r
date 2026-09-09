@@ -111,7 +111,13 @@ Highlights:
   opt-in `git-listen` build) brings the compiled `git` binary under the same
   catalog: every stdout/stderr print is intercepted with its call site and the
   `[MAP]` rules decide the real message, defaulting to verbatim pass-through so
-  Git's data output is unchanged unless explicitly mapped.
+  Git's data output is unchanged unless explicitly mapped. A native config
+  loader (`gitmsg-config.h`/`.c`) reads `.gitmessages` at startup (overriding
+  wordings and adding `[MAP]` rules), and a diagnostic hook (`gitmsg-diag.c`,
+  installed in `git.c`) routes `die`/`error`/`warning` through the catalog too —
+  active in every build, not just `git-listen`. The `gitmsg` inspector (and
+  `git-workflow.sh messages`) reports the resolved catalog, rules, and config
+  path; `gitmessages.example` is a ready-to-copy starting point.
 
 ## Native push policy
 

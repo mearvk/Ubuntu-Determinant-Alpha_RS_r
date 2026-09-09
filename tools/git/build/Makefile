@@ -36,7 +36,8 @@ C_SOURCES := \
 	$(GIT_SRC)/alter-comment.c \
 	$(GIT_SRC)/propath.c \
 	$(GIT_SRC)/messages.c \
-	$(GIT_SRC)/gitmsg-listen.c
+	$(GIT_SRC)/gitmsg-listen.c \
+	$(GIT_SRC)/gitmsg-config.c
 
 CPP_SOURCES := \
 	$(GIT_SRC)/add-budget.cpp \
@@ -61,7 +62,7 @@ OBJECTS := $(C_OBJECTS) $(CPP_OBJECTS)
 all: native-policy archive
 
 native-policy: $(OBJECTS)
-	@echo "Native policy sources compiled: add, commit, push, merge, rebase, restage, autocheck, moral, premount, temperature, alter-comment, propath, messages, gitmsg-listen"
+	@echo "Native policy sources compiled: add, commit, push, merge, rebase, restage, autocheck, moral, premount, temperature, alter-comment, propath, messages, gitmsg-listen, gitmsg-config"
 
 archive: $(LIB)
 
@@ -79,7 +80,7 @@ $(BUILD_DIR)/cpp-%.o: $(GIT_SRC)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(COMMON_CPPFLAGS) -c $< -o $@
 
 check: native-policy
-	@for header in add-budget.h commit-budget.h rebase-metadoc.h merge-metadoc.h operation-logic.h restage.h autocheck.h moral.h premount.h resume-budget.h temperature.h alter-comment.h propath.h messages.h gitmsg-listen.h; do \
+	@for header in add-budget.h commit-budget.h rebase-metadoc.h merge-metadoc.h operation-logic.h restage.h autocheck.h moral.h premount.h resume-budget.h temperature.h alter-comment.h propath.h messages.h gitmsg-listen.h gitmsg-config.h; do \
 		test -f $(GIT_SRC)/$$header || { echo "missing header: $$header"; exit 1; }; \
 	done
 	@echo "Native policy source/header set is complete."

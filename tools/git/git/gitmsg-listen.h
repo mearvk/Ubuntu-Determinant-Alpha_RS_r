@@ -73,6 +73,32 @@ int gitmsg_putchar(const char *file, const char *func, int line, int c);
 size_t gitmsg_fwrite(const char *file, const char *func, int line,
 		     const void *ptr, size_t size, size_t nmemb, FILE *stream);
 
+/*
+ * Load (or reload) the message catalog and [MAP] rules for the listener from
+ * `repo_root`'s .gitmessages (or $GIT_MESSAGES_CONFIG). Install this once at
+ * program startup; a NULL repo_root and a missing file both yield the compiled
+ * defaults with no rules (pure pass-through). Safe to call more than once.
+ */
+void gitmsg_listen_init(const char *repo_root);
+
+/*
+ * Resolve a structured diagnostic (from the die/error/warning hook) to a
+ * catalogued entry a [MAP] rule selects, or NULL to keep Git's own wording.
+ * Forward-declared struct so callers need not include messages.h.
+ */
+struct git_msg_entry;
+const struct git_msg_entry *gitmsg_resolve_diag(const char *file,
+						const char *func,
+						const char *text);
+
+/*
+ * Install the die/error/warning diagnostic hook (implemented in gitmsg-diag.c)
+ * so structured diagnostics resolve through the catalog too. Call once, early
+ * in startup, after gitmsg_listen_init(). Requires Git's usage.c routines and
+ * so links only into the full binary, not the standalone policy archive.
+ */
+void gitmsg_diag_install(void);
+
 #ifdef __cplusplus
 }
 #endif

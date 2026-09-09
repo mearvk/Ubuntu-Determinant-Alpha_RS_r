@@ -17,6 +17,7 @@
 #include "shallow.h"
 #include "trace.h"
 #include "trace2.h"
+#include "gitmsg-listen.h"
 
 #define RUN_SETUP		(1<<0)
 #define RUN_SETUP_GENTLY	(1<<1)
@@ -933,6 +934,18 @@ int cmd_main(int argc, const char **argv)
 		if (slash)
 			cmd = slash + 1;
 	}
+
+	/*
+	 * Ubuntu Determinant message treatment. Load the message catalog and
+	 * [MAP] rules (from $GIT_MESSAGES_CONFIG or ./.gitmessages) and install
+	 * the die/error/warning diagnostic hook, so both raw prints (via the
+	 * force-included listener) and structured diagnostics resolve through
+	 * the catalog. Both calls are no-ops that fall back to Git's own
+	 * behaviour when no config is present or the listener is not compiled
+	 * in, so this is safe on every build.
+	 */
+	gitmsg_listen_init(".");
+	gitmsg_diag_install();
 
 	trace_command_performance(argv);
 

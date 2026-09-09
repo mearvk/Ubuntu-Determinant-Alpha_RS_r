@@ -133,11 +133,71 @@ Design guarantees:
 Scope note: only stdout/stderr **print** primitives are interposed. Trace and
 log-file sinks are deferred by design.
 
+## Loading `.gitmessages` at runtime
+
+The compiled binary reads its config through a native loader
+(`git/gitmsg-config.{h,c}`), so no shell is involved:
+
+- **Where it looks:** `$GIT_MESSAGES_CONFIG` if set, else `./.gitmessages`,
+  else the compiled defaults.
+- **What it applies:** `[MESSAGE <id>]` blocks overlay `TEXT` / `STREAM` /
+  `SEVERITY` onto the default catalog; `[MAP]` lines become the rule table the
+  listener consults.
+- **Safety:** the overlaid catalog is re-validated with
+  `git_msg_catalog_validate()`. If an override is unsafe (an error/fatal routed
+  to stdout, or an emptied message), the loader **discards the overrides and
+  restores the compiled defaults**, records that it did so, and still returns a
+  usable result. A missing or unreadable file is not an error — it just yields
+  the defaults.
+
+`git.c` calls `gitmsg_listen_init(".")` once at startup, so the catalog and map
+are ready before any command runs.
+
+## Structured diagnostics (`die` / `error` / `warning`)
+
+Beyond raw prints, Git funnels its structured diagnostics through pluggable
+routines in `usage.c`. `git/gitmsg-diag.c` installs replacements via
+`set_die_routine` / `set_error_routine` / `set_warn_routine` (from
+`gitmsg_diag_install()`, also called once in `git.c`). Each renders the text Git
+was about to print, offers it to the catalog's `[MAP]` rules, and:
+
+- emits the catalogued wording on stderr when a rule matches, otherwise
+- delegates to Git's original routine so the wording, prefix, and `trace2`
+  behaviour are preserved exactly.
+
+The `die` route keeps `die()`'s contract (no return, `exit(128)`). Because these
+routines are installed unconditionally, structured diagnostics resolve through
+the catalog in **every** build — even the plain `git` target without the
+tree-wide print interposition.
+
+## Inspecting the catalog and config
+
+`gitmsg` is a small, self-contained inspector that reuses the same loader, so
+what it reports is exactly what the binary applies:
+
+```sh
+gitmsg path        # which config file is in effect
+gitmsg validate    # load + validate; warns if unsafe overrides were dropped
+gitmsg list        # the resolved message catalog (id, stream, severity, text)
+gitmsg rules       # the resolved [MAP] rules
+gitmsg --config <file> <cmd>   # inspect a specific file
+```
+
+The same is reachable through the workflow wrapper, which prefers the native
+`gitmsg` and otherwise falls back to its own built-in wordings:
+
+```sh
+git-workflow.sh messages [repo] [path|validate|list|rules]
+```
+
+A ready-to-copy starting point ships as `tools/git/gitmessages.example` — copy
+it to a repository root as `.gitmessages` and adjust.
+
 ## Building
 
 The companions are registered in `build/Makefile` (C and C++ sources, plus
-`messages.h` and `gitmsg-listen.h` in the header check) and build with the rest
-of the native policy:
+`messages.h`, `gitmsg-listen.h`, and `gitmsg-config.h` in the header check) and
+build with the rest of the native policy:
 
 ```sh
 make -C build          # compile + archive (includes messages, gitmsg-listen)
@@ -148,7 +208,13 @@ The full binary with the listener force-included tree-wide builds from the
 opt-in target (the default `git` target stays byte-for-byte as validated):
 
 ```sh
-make -f build/git-full.mk git          # ordinary Edition git (no listener)
-make -f build/git-full.mk git-listen   # + tree-wide print listener
+make -f build/git-full.mk git          # ordinary Edition git (catalog + diag hook)
+make -f build/git-full.mk git-listen   # + tree-wide raw-print interposition
+make -f build/git-full.mk gitmsg       # the standalone gitmsg inspector
 make -f build/git-full.mk print-listen-flags
 ```
+
+Note the split: the plain `git` build already links the catalog, the
+`.gitmessages` loader, and the diagnostic hook, so structured diagnostics
+resolve through the catalog. The `git-listen` build additionally force-includes
+the listener so raw `printf`/`fprintf` output is interposed too.
