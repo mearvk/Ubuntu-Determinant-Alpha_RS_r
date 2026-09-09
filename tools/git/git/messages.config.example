@@ -210,6 +210,47 @@ SEVERITY: info
 STREAM: stdout
 TEXT: The remote has acknowledged all work; the transfer is complete.
 
+# =============================================================================
+# MAP
+# =============================================================================
+# The tree-wide print listener (git/gitmsg-listen.h, git/gitmsg-listen.c)
+# intercepts every stdout/stderr print in the Edition Git. For each intercepted
+# write it knows the call site (source file, function) and the rendered text,
+# and consults the rules below to decide whether that write should be replaced
+# by a catalogued message. This is how "when we get an output to print, we take
+# the call site, then decide the real message" is expressed as config.
+#
+# Each rule is one `MAP:` line with whitespace-separated `key=value` selectors
+# and a `->` target message id:
+#
+#   MAP: [file=<substr>] [func=<substr>] [text=<substr>] -> <message-id>
+#
+# Selector semantics:
+#   file - matches when the call-site source file path contains <substr>.
+#   func - matches when the call-site function name contains <substr>.
+#   text - matches when the rendered output contains <substr>.
+# An omitted selector matches anything; an empty selector matches anything.
+# Rules are evaluated top to bottom; the FIRST rule that matches all of its
+# present selectors wins. The target must be a message id defined above.
+#
+# DEFAULT BEHAVIOUR: with no MAP rules (the shipped default), every intercepted
+# write passes through verbatim, so enabling the listener changes no output.
+# Git's data output (git log / diff / cat-file / the pack protocol) is only
+# ever altered where a rule explicitly maps it. A rule that resolves to an
+# error/fatal message is never allowed to route it to stdout; such a match is
+# refused and the original bytes pass through, so a diagnostic is never hidden.
+#
+# Examples (commented out; uncomment and adapt to opt in):
+#
+# # A no-space-left write from the object layer -> the mature disk-space message.
+# MAP: text=No space left on device -> disk-space
+#
+# # A "unable to read" diagnostic from the loose-object reader -> missing-file.
+# MAP: file=object-file.c text=unable to read -> missing-file
+#
+# # A specific helper's permission complaint -> the permission message.
+# MAP: func=lock_file text=Permission denied -> permission
+
 # RULE: Advisory presentation only. This config re-words, re-streams, or
 # localizes output; it never changes an operation's behaviour, never turns an
 # error into a success, never suppresses a safety refusal, never hides a

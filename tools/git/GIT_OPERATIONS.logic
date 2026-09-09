@@ -167,6 +167,18 @@ STDERR-SAFETY: A message of error or fatal severity may not be routed to stdout;
 OVERFLOW: Concern counting and any size arithmetic reject integer overflow rather than wrapping, consistent with the other operations.
 RULE: messages is advisory presentation only. It re-words, re-streams, or localizes output; it never changes an operation's behaviour, never turns an error into a success, never suppresses a safety refusal, and never authorizes a destructive action.
 
+[LISTENER]
+METHOD: Tree-wide interposition of stdout/stderr print primitives so every print reaches the message catalog with its call site before it is emitted.
+SCOPE: The output primitives (printf, fprintf, vfprintf, printf, vprintf, fputs, puts, fputc/putc, putchar, fwrite) are macro-redirected via a force-included header (git/gitmsg-listen.h) to shims in git/gitmsg-listen.c.
+SITE: Each intercepted write carries its source file, function, and line, plus the target stream and the rendered text.
+RESOLVE: The [MAP] rules match on file/function/text substrings, first match wins; a match selects a catalog message id, otherwise the write passes through unchanged.
+DEFAULT: The shipped map is empty, so enabling the listener changes no output; Git data output is altered only where a rule explicitly maps it.
+STDERR-SAFETY: A rule resolving to an error/fatal message may not route it to stdout; such a match is refused and the original bytes pass through, so a diagnostic is never hidden.
+SELF-EXCLUSION: The listener translation unit defines GITMSG_LISTEN_IMPL so its own shims call the real libc functions rather than recursing.
+BUILD: Opt-in. The known-good `git` build is unchanged; the listener links via the `git-listen` target (force-include plus gitmsg-listen.o/messages.o in LIB_OBJS).
+SCOPE-LIMIT: Only stdout/stderr print primitives are interposed; trace and log-file sinks are out of scope by design.
+RULE: The listener observes and, only where mapped, re-words or re-streams output; it never alters Git's payload output by default and never changes operation behaviour.
+
 [CHAIN]
 RULE: Every operation may record PRIOR-OPERATION and PARENT-COMMIT.
 RULE: Operation records remain individually attributable when chained.

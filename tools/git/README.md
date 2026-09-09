@@ -107,6 +107,11 @@ Highlights:
   mirrors `messages.h`; the command surface reads it as a reference/input and
   falls back to compiled defaults. Advisory presentation only — it never
   changes behaviour or hides a diagnostic (`messages.h`, see `MESSAGES.md`).
+  A tree-wide print listener (`gitmsg-listen.h`/`.c`, force-included via the
+  opt-in `git-listen` build) brings the compiled `git` binary under the same
+  catalog: every stdout/stderr print is intercepted with its call site and the
+  `[MAP]` rules decide the real message, defaulting to verbatim pass-through so
+  Git's data output is unchanged unless explicitly mapped.
 
 ## Native push policy
 
