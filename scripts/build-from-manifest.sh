@@ -197,6 +197,7 @@ declare -a BUILD_ORDER=(
     "java"
     "chromium"
     "desktop"
+    "jwstf-install"
     "initramfs"
     "grub"
 )
