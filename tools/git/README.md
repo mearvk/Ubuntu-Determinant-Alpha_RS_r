@@ -77,7 +77,7 @@ in `git/` (a `<op>.h` contract plus C and C++ companions), a metadoc, and a
 block in `GIT_OPERATIONS.logic`. The current operation set is:
 
 ```
-premount, add, commit, push, resume, merge, rebase, restage, autocheck, moral, temperature, alter-comment, propath
+premount, add, commit, push, resume, merge, rebase, restage, autocheck, moral, temperature, alter-comment, propath, messages
 ```
 
 Highlights:
@@ -100,6 +100,13 @@ Highlights:
   fetches the rest on demand (shallow/iterative or recursive), evicting unused
   local copies after ~2 days; config-file driven (`propath.h`, see
   `PROPATH.md`).
+- **messages** — a centralized catalog of the stdout/stderr text the Edition
+  Git emits and the concern classes it reports (memory bloat, disk space,
+  missing files, size ceiling, overflow, permission, corruption, …). Seeded
+  from a per-repository config document (recommended `.gitmessages`) that
+  mirrors `messages.h`; the command surface reads it as a reference/input and
+  falls back to compiled defaults. Advisory presentation only — it never
+  changes behaviour or hides a diagnostic (`messages.h`, see `MESSAGES.md`).
 
 ## Native push policy
 
@@ -270,5 +277,6 @@ prevents an oversized push effort from being attempted.
 | `MORAL.md` | symbolic blessing operation |
 | `ALTER_COMMENT.md` | integer-addressed commit-message alteration |
 | `PROPATH.md` | path-scoped lazily-expanding partial clone + idle eviction |
+| `MESSAGES.md` | centralized stdout/stderr message + concern catalog and its config |
 | `FOUNDING.md`, `EXPLANATIONS.md` | project rationale and detailed notes |
 | `GIT_OPERATIONS.logic` | the line-oriented operation contract |

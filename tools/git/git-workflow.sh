@@ -46,23 +46,135 @@ EOF
 
 REPO="${2:-.}"
 
+# -----------------------------------------------------------------------------
+# Message & concern catalog (see MESSAGES.md, git/messages.config.example).
+#
+# The human-facing text this wrapper emits is defined in a config document
+# rather than hardcoded, and consulted here as a reference/input. Resolution:
+#   1. $REPO/.gitmessages         (per-repository override), else
+#   2. <script dir>/git/messages.config.example  (the shipped defaults).
+# A missing, stale, or altered config falls back to the compiled-in defaults
+# below. Per the config's own RULE, this only re-words/re-streams output; it
+# never changes behaviour, and a diagnostic (error/fatal) is never routed to
+# stdout — such an override is ignored in favour of the safe default.
+# -----------------------------------------------------------------------------
+
+WF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Compiled-in default wordings, keyed by message id. Kept byte-identical to the
+# native default catalog in git/messages.c / git/messages.cpp.
+declare -A WF_MSG_TEXT=(
+  [git-required]="Git is required but was not found on PATH. Please install Git and try again."
+  [not-a-repo]="The target path is not a Git repository. Choose a repository or initialize one first."
+  [tree-not-clean]="The working tree has uncommitted changes. This operation was declined to protect them; commit or stash first."
+  [detached-head]="HEAD is detached, so no branch can be inferred. Please name the branch explicitly."
+  [nothing-staged]="There are no staged changes to commit. Stage the intended paths and try again."
+  [message-required]="A commit message is required. Please provide one."
+  [pathspec-required]="At least one pathspec is required for this operation."
+  [bad-argument]="An argument was not understood. Please review the usage and try again."
+  [unknown-command]="That command is not recognized. See the usage for the available commands."
+  [size-ceiling]="A single item exceeds the 200 MiB transaction ceiling and cannot be split, so the plan cannot proceed. Please reduce the item or adjust the plan."
+  [memory-bloat]="Memory use has grown beyond the advisory budget for this operation. Consider working in smaller batches."
+  [disk-space]="There is not enough free disk space to complete this operation safely. Please free space and try again."
+  [missing-file]="An expected file or object could not be found. Please confirm the path and repository state."
+  [corruption]="An integrity check failed, which suggests a damaged file or object. No changes were made; please run a repository check before continuing."
+  [overflow]="A size or count calculation would overflow and was rejected rather than allowed to wrap. Please reduce the scope of the request."
+  [permission]="Permission was denied for this action. Please check file and remote permissions and try again."
+  [no-digest-tool]="No suitable checksum tool (SHA-256 or SHA-512) is available, so an integrity reference cannot be computed."
+  [resume-interrupted]="The connection was interrupted; the remaining work will resume from the last acknowledged point."
+  [resume-halted]="The retry limit was reached with work still remaining, so the effort was halted rather than looping. Please retry when the connection is stable."
+  [resume-complete]="The remote has acknowledged all work; the transfer is complete."
+)
+
+# Default stream per message id: stderr for diagnostics, stdout for results.
+declare -A WF_MSG_STREAM=(
+  [resume-complete]="stdout"
+)
+
+# Locate the active config document, if any.
+wf_msg_config_path() {
+  if [ -f "$REPO/.gitmessages" ]; then
+    printf '%s\n' "$REPO/.gitmessages"
+  elif [ -f "$WF_SCRIPT_DIR/git/messages.config.example" ]; then
+    printf '%s\n' "$WF_SCRIPT_DIR/git/messages.config.example"
+  fi
+}
+
+# Load TEXT/STREAM overrides from the config's [MESSAGE <id>] blocks. Any
+# override that would route an error/fatal message to stdout is ignored so a
+# config can never hide a diagnostic; missing keys keep the compiled default.
+wf_msg_load_config() {
+  local cfg id="" key val sev="" stream=""
+  cfg="$(wf_msg_config_path)" || return 0
+  [ -n "$cfg" ] && [ -r "$cfg" ] || return 0
+
+  # Commit a pending block's overrides, honouring the stdout-safety rule.
+  _wf_commit() {
+    [ -n "$id" ] || return 0
+    if [ -n "${WF_MSG_TEXT[$id]+x}" ]; then
+      [ -n "$stream" ] && case "$sev" in
+        error|fatal) [ "$stream" = stdout ] && stream="" ;;  # refuse to hide
+      esac
+      [ -n "$stream" ] && WF_MSG_STREAM[$id]="$stream"
+    fi
+    id=""; sev=""; stream=""
+  }
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      \#*|"") continue ;;
+      \[MESSAGE\ *\])
+        _wf_commit
+        id="${line#\[MESSAGE }"; id="${id%\]}"
+        id="$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+        [ -n "${WF_MSG_TEXT[$id]+x}" ] || id=""   # unknown id: ignore block
+        ;;
+      \[*\]) _wf_commit ;;                          # any other section ends it
+      *:*)
+        [ -n "$id" ] || continue
+        key="$(printf '%s' "${line%%:*}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+        val="${line#*:}"; val="${val# }"
+        case "$key" in
+          text)   [ -n "$val" ] && WF_MSG_TEXT[$id]="$val" ;;
+          stream) stream="$(printf '%s' "$val" | tr -d '[:space:]')" ;;
+          severity) sev="$(printf '%s' "$val" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" ;;
+        esac
+        ;;
+    esac
+  done < "$cfg"
+  _wf_commit
+  unset -f _wf_commit
+}
+
+wf_msg_load_config
+
+# Emit the configured message for an id on its configured stream.
+wf_msg() {
+  local id="$1"; local text="${WF_MSG_TEXT[$id]:-$id}"
+  if [ "${WF_MSG_STREAM[$id]:-stderr}" = stdout ]; then
+    printf '%s\n' "$text"
+  else
+    printf '%s\n' "$text" >&2
+  fi
+}
+
 require_git() {
   command -v git >/dev/null 2>&1 || {
-    echo "ERROR: git is required." >&2
+    wf_msg git-required
     exit 1
   }
 }
 
 require_repo() {
   git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || {
-    echo "ERROR: not a Git repository: $REPO" >&2
+    wf_msg not-a-repo
     exit 1
   }
 }
 
 require_clean_before_sync() {
   if [ -n "$(git -C "$REPO" status --porcelain)" ]; then
-    echo "ERROR: working tree is not clean; refusing to sync." >&2
+    wf_msg tree-not-clean
     git -C "$REPO" status --short >&2
     exit 1
   fi
@@ -122,7 +234,7 @@ premount_push() {
   [ -n "$remote" ] || remote="origin"
 
   [ -n "$branch" ] || branch="$(git -C "$repo" branch --show-current)"
-  [ -n "$branch" ] || { echo "ERROR: detached HEAD; specify a branch explicitly." >&2; return 2; }
+  [ -n "$branch" ] || { wf_msg detached-head; return 2; }
 
   local root; root="$(git -C "$repo" rev-parse --show-toplevel)"
 
@@ -158,7 +270,7 @@ premount_push() {
     [ -n "$sz" ] || sz=0
 
     if [ "$sz" -gt "$TXN" ]; then
-      echo "ERROR: premount push: '$p' ($sz bytes) exceeds the 200 MiB transaction size; cannot plan." >&2
+      wf_msg size-ceiling; echo "       item: '$p' ($sz bytes)" >&2
       oversize=1
       break
     fi
@@ -178,7 +290,7 @@ premount_push() {
   # --- Compute the SHA-256-or-better reference over the deterministic body ---
   local tool_line algo_label digest_cmd
   if ! tool_line="$(premount_digest_tool "$algo")"; then
-    echo "ERROR: premount push: no $algo digest tool available." >&2
+    wf_msg no-digest-tool; echo "       requested: $algo" >&2
     return 1
   fi
   algo_label="${tool_line%%$'\t'*}"; digest_cmd="${tool_line#*$'\t'}"
@@ -246,7 +358,7 @@ cmd_push_resume() {
       return 0
     fi
     if [ "$max_attempts" -ne 0 ] && [ "$attempt" -ge "$max_attempts" ]; then
-      echo "ERROR: push-resume halted: retry ceiling reached with work remaining." >&2
+      wf_msg resume-halted
       echo "       remote tip: ${ack:-<none>}  local tip: $local_tip" >&2
       return 1
     fi
@@ -260,7 +372,7 @@ cmd_push_resume() {
       fi
       echo "push-resume: push returned success but remote not fully acknowledged; continuing."
     else
-      echo "push-resume: attempt ${attempt} interrupted (slow/lossy connection); will resume remainder." >&2
+      echo "push-resume: attempt ${attempt}:" >&2; wf_msg resume-interrupted
     fi
     sleep 1
   done
@@ -305,7 +417,7 @@ case "$command" in
   sync)
     REMOTE="${3:-origin}"
     BRANCH="${4:-$(git -C "$REPO" branch --show-current)}"
-    [ -n "$BRANCH" ] || { echo "ERROR: detached HEAD; specify a branch explicitly." >&2; exit 2; }
+    [ -n "$BRANCH" ] || { wf_msg detached-head; exit 2; }
     require_clean_before_sync
     git -C "$REPO" fetch --prune "$REMOTE"
     git -C "$REPO" merge --ff-only "$REMOTE/$BRANCH"
@@ -313,16 +425,16 @@ case "$command" in
 
   stage)
     shift 2
-    [ "$#" -gt 0 ] || { echo "ERROR: stage requires at least one pathspec." >&2; exit 2; }
+    [ "$#" -gt 0 ] || { wf_msg pathspec-required; exit 2; }
     git -C "$REPO" add -- "$@"
     git -C "$REPO" status --short
     ;;
 
   commit)
     MESSAGE="${3:-}"
-    [ -n "$MESSAGE" ] || { echo "ERROR: commit requires a message." >&2; exit 2; }
+    [ -n "$MESSAGE" ] || { wf_msg message-required; exit 2; }
     git -C "$REPO" diff --cached --quiet && {
-      echo "ERROR: no staged changes to commit." >&2
+      wf_msg nothing-staged
       exit 1
     }
     git -C "$REPO" commit -m "$MESSAGE"
@@ -331,7 +443,7 @@ case "$command" in
   push)
     REMOTE="${3:-origin}"
     BRANCH="${4:-$(git -C "$REPO" branch --show-current)}"
-    [ -n "$BRANCH" ] || { echo "ERROR: detached HEAD; specify a branch explicitly." >&2; exit 2; }
+    [ -n "$BRANCH" ] || { wf_msg detached-head; exit 2; }
     git -C "$REPO" push --set-upstream "$REMOTE" "$BRANCH"
     ;;
 
@@ -463,9 +575,9 @@ case "$command" in
     # ordered commit of the currently staged set and reports the resulting tip
     # so push-resume can checkpoint against it. It never rewrites history.
     MESSAGE="${3:-}"
-    [ -n "$MESSAGE" ] || { echo "ERROR: commit-parts requires a message." >&2; exit 2; }
+    [ -n "$MESSAGE" ] || { wf_msg message-required; exit 2; }
     git -C "$REPO" diff --cached --quiet && {
-      echo "ERROR: no staged changes to commit." >&2
+      wf_msg nothing-staged
       exit 1
     }
     BEFORE="$(git -C "$REPO" rev-parse --verify --quiet HEAD 2>/dev/null || true)"
@@ -489,7 +601,7 @@ case "$command" in
     # policy or the native 200 MiB push ceiling. See tools/git/RESUME.md.
     REMOTE="${3:-origin}"
     BRANCH="${4:-$(git -C "$REPO" branch --show-current)}"
-    [ -n "$BRANCH" ] || { echo "ERROR: detached HEAD; specify a branch explicitly." >&2; exit 2; }
+    [ -n "$BRANCH" ] || { wf_msg detached-head; exit 2; }
 
     # Optional --attempts N (0 = unlimited by policy). Default 5.
     MAX_ATTEMPTS=5
@@ -660,7 +772,7 @@ case "$command" in
     ;;
 
   *)
-    echo "ERROR: unknown command: $command" >&2
+    wf_msg unknown-command; echo "       command: $command" >&2
     usage
     ;;
 esac

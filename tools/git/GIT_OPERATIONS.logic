@@ -2,7 +2,7 @@
 # UTF-8 plain text, line-oriented .logic contract
 
 LOGIC-VERSION: 1
-OPERATIONS: premount,add,commit,push,resume,merge,rebase,restage,autocheck,moral,temperature,alter-comment,propath
+OPERATIONS: premount,add,commit,push,resume,merge,rebase,restage,autocheck,moral,temperature,alter-comment,propath,messages
 
 [ORIGINAL]
 RULE: Preserve each operation's ordinary Git file and history semantics.
@@ -154,6 +154,18 @@ CONFIG: Defaults come from a per-repository config file (recommended `.propath`)
 OVERFLOW: Eviction-candidate counting rejects integer overflow rather than wrapping.
 PROVENANCE: Preserve author, committer, date, timestamp, parent object, and relevant path references; record prior operation when chained.
 RULE: propath is advisory local scope/cache bookkeeping; it never rewrites history, never changes remote object identity, and a stale or altered config never authorizes deleting un-pushed work.
+
+[MESSAGES]
+METHOD: Centralized catalog of the human-facing stdout/stderr text and the concern classes those messages describe; seeded from a per-repository config document (recommended `.gitmessages`) mirroring git/messages.h.
+STREAM: stdout carries results and progress; stderr carries diagnostics (note, warning, error, fatal). Each catalog entry names its own authoritative stream.
+SEVERITY: info, note, warning, error, fatal, in increasing order. info is a result; note and above are diagnostics.
+CONCERN: A message reports one concern class: memory-bloat, disk-space, size-ceiling, arithmetic-overflow (resource); missing-file, corruption, provenance-gap (integrity); permission, precondition, network-loss (precondition); or none for ordinary success.
+DEFINE: Each concern carries a settled one-line definition and a default severity/stream; a message may report `none` when it is ordinary progress.
+CATALOG: Every message is addressed by a stable id; the id, its stream, and its severity are the contract, while the text may be re-worded by config. Ids are present exactly once and each entry carries non-empty text.
+FALLBACK: A missing, stale, or altered config falls back to the compiled defaults in git/messages.h; it never fails an operation or invents a permissive result.
+STDERR-SAFETY: A message of error or fatal severity may not be routed to stdout; such an override is rejected and the safe default is used, so a diagnostic can never be hidden.
+OVERFLOW: Concern counting and any size arithmetic reject integer overflow rather than wrapping, consistent with the other operations.
+RULE: messages is advisory presentation only. It re-words, re-streams, or localizes output; it never changes an operation's behaviour, never turns an error into a success, never suppresses a safety refusal, and never authorizes a destructive action.
 
 [CHAIN]
 RULE: Every operation may record PRIOR-OPERATION and PARENT-COMMIT.

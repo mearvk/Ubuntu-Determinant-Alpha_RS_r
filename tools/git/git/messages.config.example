@@ -1,0 +1,218 @@
+# Ubuntu Determinant Git message & concern configuration (example).
+#
+# A single, reviewable document for the human-facing text the Edition Git emits
+# on stdout and stderr, and for the *concerns* those messages describe (memory
+# bloat, disk-space exhaustion, missing files, and the like).
+#
+# Format: UTF-8, line-oriented `KEY: value`. Blank lines and `#` comments are
+# ignored. Keys are case-insensitive; for a given message or concern the first
+# occurrence of a scalar key wins. Sections are opened by a `[NAME]` header and
+# continue until the next header. This mirrors the conventions of
+# GIT_OPERATIONS.logic and git/propath.config.example.
+#
+# The recommended location is `.gitmessages` at the repository root (see
+# MESSAGES.md). This file mirrors the native enums and default catalog in
+# git/messages.h; the command surface (git-workflow.sh) reads it as a reference
+# and input.
+#
+# Safety. This document only re-words, re-streams, or localizes output. A stale,
+# missing, or altered config falls back to the compiled defaults in messages.h;
+# it can never turn an error into a success, suppress a safety refusal, route a
+# diagnostic away from stderr to hide it, change a failing exit status into a
+# passing one, or authorize a destructive action.
+
+MESSAGES-VERSION: 1
+
+# =============================================================================
+# CONCERNS
+# =============================================================================
+# A concern is the underlying condition an operation may need to report; a
+# message (below) is how that condition is phrased. Each concern has a settled
+# definition and a default severity. Concern keys:
+#
+#   DEFINE   - the mature, one-line definition of the concern.
+#   SEVERITY - default severity when this concern is reported:
+#              info | note | warning | error | fatal.
+#   STREAM   - default stream: stdout | stderr. Diagnostics (note and above)
+#              default to stderr; results default to stdout. A concern of
+#              error/fatal severity may not be routed to stdout.
+#   DETECT   - (optional) the observable signal(s) that indicate the concern;
+#              advisory documentation only, never a promise of detection.
+
+# --- Resource concerns -------------------------------------------------------
+[CONCERN memory-bloat]
+DEFINE: Resident/working-set memory growth beyond the advisory budget for an operation.
+SEVERITY: warning
+STREAM: stderr
+DETECT: Working-set estimate exceeds the per-operation advisory budget.
+
+[CONCERN disk-space]
+DEFINE: Insufficient or nearly-exhausted local disk space to complete an operation safely.
+SEVERITY: error
+STREAM: stderr
+DETECT: A write fails with ENOSPC, or free space falls below the required estimate.
+
+[CONCERN size-ceiling]
+DEFINE: A planned unit exceeds a policy size ceiling (such as the 200 MiB push/transaction budget) and must not be split.
+SEVERITY: error
+STREAM: stderr
+DETECT: An ordered item or transaction measures larger than the compiled ceiling.
+
+[CONCERN arithmetic-overflow]
+DEFINE: A size or count computation would overflow; it is rejected rather than allowed to wrap.
+SEVERITY: error
+STREAM: stderr
+DETECT: A running total or rewrite/eviction count would exceed its integer range.
+
+# --- Integrity concerns ------------------------------------------------------
+[CONCERN missing-file]
+DEFINE: An expected file, path, or object is absent.
+SEVERITY: error
+STREAM: stderr
+DETECT: A required path or object id cannot be resolved.
+
+[CONCERN corruption]
+DEFINE: A file or object failed an integrity or fsck check and may be damaged.
+SEVERITY: fatal
+STREAM: stderr
+DETECT: A checksum, fsck, or object-parse check fails.
+
+[CONCERN provenance-gap]
+DEFINE: Required provenance (author, committer, parent, or reference) is absent; it is recorded as absent, never invented.
+SEVERITY: note
+STREAM: stderr
+DETECT: An expected provenance field is missing when a record is emitted.
+
+# --- Precondition concerns ---------------------------------------------------
+[CONCERN permission]
+DEFINE: A filesystem or transport permission prevents the requested action.
+SEVERITY: error
+STREAM: stderr
+DETECT: An open, write, or transport step fails with a permission error.
+
+[CONCERN precondition]
+DEFINE: A required state is unmet (not a repository, detached HEAD, a dirty tree, nothing staged, a missing tool, or a malformed argument).
+SEVERITY: error
+STREAM: stderr
+DETECT: A guard check fails before the operation begins.
+
+[CONCERN network-loss]
+DEFINE: A slow, lossy, or interrupted connection. This is a normal condition handled by resume, not a failure in itself.
+SEVERITY: note
+STREAM: stderr
+DETECT: A transport attempt is interrupted or the remote acknowledges fewer units than sent.
+
+# =============================================================================
+# MESSAGES
+# =============================================================================
+# Each message is addressed by a stable ID (matching enum git_msg_id in
+# messages.h). Message keys:
+#
+#   TEXT     - the wording. Required; must be non-empty. Careful and mature:
+#              state the condition, say what the tool did or declined to do,
+#              and where useful how to proceed. No blame and no exclamation.
+#   STREAM   - stdout | stderr. Defaults from the message's concern.
+#   SEVERITY - info | note | warning | error | fatal. Defaults from the concern.
+#   CONCERN  - the concern this message reports (one of the names above, or
+#              `none` for ordinary success/progress).
+#
+# A message of error/fatal severity may not be routed to stdout; such a config
+# is rejected and the compiled default is used instead.
+
+# --- Environment / preconditions (shared) ------------------------------------
+[MESSAGE git-required]
+CONCERN: precondition
+SEVERITY: error
+STREAM: stderr
+TEXT: Git is required but was not found on PATH. Please install Git and try again.
+
+[MESSAGE not-a-repo]
+CONCERN: precondition
+TEXT: The target path is not a Git repository. Choose a repository or initialize one first.
+
+[MESSAGE tree-not-clean]
+CONCERN: precondition
+TEXT: The working tree has uncommitted changes. This operation was declined to protect them; commit or stash first.
+
+[MESSAGE detached-head]
+CONCERN: precondition
+TEXT: HEAD is detached, so no branch can be inferred. Please name the branch explicitly.
+
+[MESSAGE nothing-staged]
+CONCERN: precondition
+TEXT: There are no staged changes to commit. Stage the intended paths and try again.
+
+[MESSAGE message-required]
+CONCERN: precondition
+TEXT: A commit message is required. Please provide one.
+
+[MESSAGE pathspec-required]
+CONCERN: precondition
+TEXT: At least one pathspec is required for this operation.
+
+[MESSAGE bad-argument]
+CONCERN: precondition
+TEXT: An argument was not understood. Please review the usage and try again.
+
+[MESSAGE unknown-command]
+CONCERN: precondition
+TEXT: That command is not recognized. See the usage for the available commands.
+
+# --- Resource / integrity concerns -------------------------------------------
+[MESSAGE size-ceiling]
+CONCERN: size-ceiling
+TEXT: A single item exceeds the 200 MiB transaction ceiling and cannot be split, so the plan cannot proceed. Please reduce the item or adjust the plan.
+
+[MESSAGE memory-bloat]
+CONCERN: memory-bloat
+SEVERITY: warning
+TEXT: Memory use has grown beyond the advisory budget for this operation. Consider working in smaller batches.
+
+[MESSAGE disk-space]
+CONCERN: disk-space
+TEXT: There is not enough free disk space to complete this operation safely. Please free space and try again.
+
+[MESSAGE missing-file]
+CONCERN: missing-file
+TEXT: An expected file or object could not be found. Please confirm the path and repository state.
+
+[MESSAGE corruption]
+CONCERN: corruption
+SEVERITY: fatal
+TEXT: An integrity check failed, which suggests a damaged file or object. No changes were made; please run a repository check before continuing.
+
+[MESSAGE overflow]
+CONCERN: arithmetic-overflow
+TEXT: A size or count calculation would overflow and was rejected rather than allowed to wrap. Please reduce the scope of the request.
+
+[MESSAGE permission]
+CONCERN: permission
+TEXT: Permission was denied for this action. Please check file and remote permissions and try again.
+
+[MESSAGE no-digest-tool]
+CONCERN: precondition
+TEXT: No suitable checksum tool (SHA-256 or SHA-512) is available, so an integrity reference cannot be computed.
+
+# --- Transport / resume progress ---------------------------------------------
+[MESSAGE resume-interrupted]
+CONCERN: network-loss
+SEVERITY: note
+TEXT: The connection was interrupted; the remaining work will resume from the last acknowledged point.
+
+[MESSAGE resume-halted]
+CONCERN: network-loss
+SEVERITY: error
+TEXT: The retry limit was reached with work still remaining, so the effort was halted rather than looping. Please retry when the connection is stable.
+
+[MESSAGE resume-complete]
+CONCERN: none
+SEVERITY: info
+STREAM: stdout
+TEXT: The remote has acknowledged all work; the transfer is complete.
+
+# RULE: Advisory presentation only. This config re-words, re-streams, or
+# localizes output; it never changes an operation's behaviour, never turns an
+# error into a success, never suppresses a safety refusal, never hides a
+# diagnostic by routing it to stdout, and never authorizes a destructive
+# action. A stale, missing, or altered config falls back to the compiled
+# defaults in git/messages.h.
